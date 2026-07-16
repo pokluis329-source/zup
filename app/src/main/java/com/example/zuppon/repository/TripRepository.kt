@@ -23,8 +23,6 @@ object TripRepository {
     private val pollHandler = Handler(Looper.getMainLooper())
     private var isPolling = false
     private val POLL_INTERVAL_MS = 3_000L  // 3s — más rápido para el repartidor
-    // IDs de pedidos ya mostrados al repartidor (para no repetir el mismo)
-    private val shownOrderIds = mutableSetOf<Int>()
     // IDs rechazados temporalmente: id → timestamp hasta el que se ignoran (60s)
     private val tempRejectedIds = mutableMapOf<Int, Long>()
 
@@ -94,7 +92,11 @@ object TripRepository {
             destination = request.destination,
             fare        = request.fare,
             destLat     = request.destLat,
-            destLng     = request.destLng
+            destLng     = request.destLng,
+            onSuccess   = { order ->
+                // Guardar el ID del servidor para que cancelOrder funcione
+                com.example.zuppon.network.NetworkRepository.serverOrderId = order.id
+            }
         )
     }
 
@@ -235,7 +237,6 @@ object TripRepository {
     private fun startPolling() {
         if (isPolling) return
         isPolling = true
-        shownOrderIds.clear()
         pollHandler.post(pollRunnable)
     }
 
@@ -254,7 +255,6 @@ object TripRepository {
 
     private fun fetchPendingOrders() {
         if (_driverStatus.value != DriverStatus.ONLINE) return
-        if (_tripState.value == TripState.SearchingDriver) return
 
         val now = System.currentTimeMillis()
         // Limpiar rechazados expirados para que puedan reaparecer
@@ -262,12 +262,16 @@ object TripRepository {
 
         com.example.zuppon.network.NetworkRepository.fetchAllOrders(
             onSuccess = { orders ->
-                val pending = orders.filter { it.status == "PENDING" }
-                    .firstOrNull { it.id !in shownOrderIds && (tempRejectedIds[it.id] ?: 0L) < now }
+                // Si ya hay un pedido mostrándose, no interrumpir
+                if (_tripState.value == TripState.SearchingDriver
+                    && _pendingRequest.value != null) return@fetchAllOrders
+
+                val pending = orders
+                    .filter { it.status == "PENDING" }
+                    .firstOrNull { (tempRejectedIds[it.id] ?: 0L) < now }
                     ?: return@fetchAllOrders
 
-                shownOrderIds.add(pending.id)
-                // Guardar el ID del servidor para poder aceptarlo después
+                // Guardar el ID del servidor para poder aceptarlo/cancelarlo
                 com.example.zuppon.network.NetworkRepository.serverOrderId = pending.id
 
                 val request = TripRequest(
