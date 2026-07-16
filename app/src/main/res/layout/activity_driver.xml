@@ -224,16 +224,21 @@
                 </androidx.core.widget.NestedScrollView>
             </LinearLayout>
 
-            <!-- Online / esperando -->
+            <!-- Online / esperando o con pedidos disponibles -->
             <LinearLayout android:id="@+id/layout_online"
                 android:layout_width="0dp" android:layout_height="wrap_content"
-                android:orientation="vertical" android:gravity="center"
+                android:orientation="vertical"
                 android:visibility="gone"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent">
-                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+
+                <!-- Header: spinner + texto "esperando" -->
+                <LinearLayout
+                    android:id="@+id/layout_waiting"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_gravity="center_horizontal"
                     android:layout_marginBottom="12dp">
                     <ProgressBar android:layout_width="28dp" android:layout_height="28dp"
                         android:indeterminateTint="@color/zuppon_green"
@@ -243,10 +248,32 @@
                         android:textColor="@color/white"
                         android:textSize="15sp" android:textStyle="bold" />
                 </LinearLayout>
+
+                <!-- Lista de pedidos PENDING (visible cuando hay pedidos) -->
+                <TextView
+                    android:id="@+id/tv_orders_available"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔔 Pedidos disponibles"
+                    android:textColor="@color/zuppon_yellow"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"
+                    android:visibility="gone" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_pending_orders"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="320dp"
+                    android:nestedScrollingEnabled="false"
+                    android:visibility="gone" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_go_offline"
                     style="@style/ZupponButtonOutline"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:text="@string/go_offline" />
             </LinearLayout>
 

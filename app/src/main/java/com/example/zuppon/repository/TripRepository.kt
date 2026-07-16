@@ -26,6 +26,13 @@ object TripRepository {
     // IDs rechazados temporalmente: id → timestamp hasta el que se ignoran (60s)
     private val tempRejectedIds = mutableMapOf<Int, Long>()
 
+    // Lista de TODOS los pedidos PENDING visibles para el repartidor
+    private val _pendingOrders = MutableLiveData<List<TripRequest>>(emptyList())
+    val pendingOrders: LiveData<List<TripRequest>> = _pendingOrders
+
+    // Mapa server_id → TripRequest para aceptar un pedido específico de la lista
+    private val pendingOrderMap = mutableMapOf<Int, TripRequest>()
+
     fun init(context: Context) {
         appContext = context.applicationContext
         // Cargar historial en background para no bloquear el main thread
@@ -121,6 +128,8 @@ object TripRepository {
     fun driverGoOffline() {
         _driverStatus.value = DriverStatus.OFFLINE
         stopPolling()
+        _pendingOrders.value = emptyList()
+        pendingOrderMap.clear()
     }
 
     /** Arranca el polling si el driver está ONLINE y no está ya corriendo.
@@ -131,13 +140,18 @@ object TripRepository {
         }
     }
 
+    fun driverRejectOrder(serverId: Int) {
+        tempRejectedIds[serverId] = System.currentTimeMillis() + 60_000L
+        pendingOrderMap.remove(serverId)
+        _pendingOrders.value = pendingOrderMap.values.toList()
+    }
+
     fun driverRejectTrip() {
-        // Tomar el ID del pedido actual (currentOrderId es el que seteó el polling)
-        val rejectedId = if (currentOrderId != -1L) currentOrderId.toInt()
-                         else com.example.zuppon.network.NetworkRepository.serverOrderId
+        val rejectedId = com.example.zuppon.network.NetworkRepository.serverOrderId
         if (rejectedId != -1) {
-            // Bloquear 60s — el driver puede reconsiderar tocando el marker que queda en pantalla
             tempRejectedIds[rejectedId] = System.currentTimeMillis() + 60_000L
+            pendingOrderMap.remove(rejectedId)
+            _pendingOrders.value = pendingOrderMap.values.toList()
         }
         _tripState.value = TripState.Idle
         _pendingRequest.value = null
@@ -145,8 +159,40 @@ object TripRepository {
         startPolling()
     }
 
+    /** Acepta un pedido específico de la lista por su server ID */
+    fun driverAcceptOrder(serverId: Int) {
+        val request = pendingOrderMap[serverId] ?: return
+        stopPolling()
+        _pendingOrders.value = emptyList()
+        pendingOrderMap.clear()
+        _driverStatus.value = DriverStatus.ACTIVE_TRIP
+        _tripStep.value = 0
+        _tripState.value = TripState.DriverOnWay(myCourierInfo)
+        _pendingRequest.value = request
+
+        com.example.zuppon.network.NetworkRepository.serverOrderId = serverId
+        val record = OrderRecord(
+            id          = serverId.toLong(),
+            items       = request.passengerName,
+            destination = request.destination,
+            fare        = request.fare,
+            status      = OrderStatus.ACCEPTED
+        )
+        currentOrderId = record.id
+        addOrUpdateHistory(record)
+
+        com.example.zuppon.network.NetworkRepository.acceptOrder(
+            serverId,
+            com.example.zuppon.network.NetworkRepository.serverDriverId,
+            myCourierInfo.name,
+            myCourierInfo.carModel
+        )
+    }
+
     fun driverAcceptTrip() {
-        stopPolling()   // dejar de buscar más pedidos mientras está activo
+        stopPolling()
+        _pendingOrders.value = emptyList()
+        pendingOrderMap.clear()
         _driverStatus.value = DriverStatus.ACTIVE_TRIP
         _tripStep.value = 0
         _tripState.value = TripState.DriverOnWay(myCourierInfo)
@@ -226,6 +272,10 @@ object TripRepository {
         }
     }
 
+    /** Devuelve el server ID de un TripRequest buscando en pendingOrderMap. -1 si no se encuentra. */
+    fun getServerIdForRequest(request: TripRequest): Int =
+        pendingOrderMap.entries.firstOrNull { it.value == request }?.key ?: -1
+
     // Compatibilidad con llamadas antiguas
     fun driverAcceptTrip(state: TripState.DriverOnWay) { driverAcceptTrip() }
     fun driverArrived(state: TripState.DriverArrived)   { driverArrived() }
@@ -257,43 +307,43 @@ object TripRepository {
         if (_driverStatus.value != DriverStatus.ONLINE) return
 
         val now = System.currentTimeMillis()
-        // Limpiar rechazados expirados para que puedan reaparecer
         tempRejectedIds.entries.removeAll { it.value < now }
 
         com.example.zuppon.network.NetworkRepository.fetchAllOrders(
             onSuccess = { orders ->
-                // Si ya hay un pedido mostrándose, no interrumpir
-                if (_tripState.value == TripState.SearchingDriver
-                    && _pendingRequest.value != null) return@fetchAllOrders
+                if (_driverStatus.value != DriverStatus.ONLINE) return@fetchAllOrders
 
-                val pending = orders
-                    .filter { it.status == "PENDING" }
-                    .firstOrNull { (tempRejectedIds[it.id] ?: 0L) < now }
-                    ?: return@fetchAllOrders
+                // Filtrar PENDING y no rechazados temporalmente
+                val pendingDtos = orders.filter {
+                    it.status == "PENDING" && (tempRejectedIds[it.id] ?: 0L) < now
+                }
 
-                // Guardar el ID del servidor para poder aceptarlo/cancelarlo
-                com.example.zuppon.network.NetworkRepository.serverOrderId = pending.id
+                // Actualizar el mapa — agrega nuevos, elimina los que ya no son PENDING
+                val activeIds = pendingDtos.map { it.id }.toSet()
+                pendingOrderMap.keys.retainAll(activeIds)
 
-                val request = TripRequest(
-                    passengerName = pending.items.ifBlank { pending.client_name },
-                    destination   = pending.destination,
-                    fare          = pending.fare,
-                    destLat       = pending.dest_lat,
-                    destLng       = pending.dest_lng
-                )
-                _pendingRequest.value = request
+                pendingDtos.forEach { dto ->
+                    // Solo agregar si no estaba ya (evitar sobrescribir innecesariamente)
+                    if (!pendingOrderMap.containsKey(dto.id)) {
+                        pendingOrderMap[dto.id] = TripRequest(
+                            passengerName = dto.items.ifBlank { dto.client_name },
+                            destination   = dto.destination,
+                            fare          = dto.fare,
+                            destLat       = dto.dest_lat,
+                            destLng       = dto.dest_lng
+                        )
+                        // Agregar al historial para el driver
+                        addOrUpdateHistory(OrderRecord(
+                            id          = dto.id.toLong(),
+                            items       = dto.items.ifBlank { dto.client_name },
+                            destination = dto.destination,
+                            fare        = dto.fare,
+                            status      = OrderStatus.PENDING
+                        ))
+                    }
+                }
 
-                val record = OrderRecord(
-                    id          = pending.id.toLong(),
-                    items       = pending.items.ifBlank { pending.client_name },
-                    destination = pending.destination,
-                    fare        = pending.fare,
-                    status      = OrderStatus.PENDING
-                )
-                currentOrderId = record.id
-                addOrUpdateHistory(record)
-
-                _tripState.value = TripState.SearchingDriver
+                _pendingOrders.value = pendingOrderMap.values.toList()
             },
             onError = { /* ignorar errores de red silenciosamente */ }
         )
