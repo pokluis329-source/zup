@@ -1,0 +1,29 @@
+# Android
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+app/build/
+
+# Python / Flask backend
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/instance/
+backend/zuppon.db        # base de datos local — el VPS tiene la suya
+backend/.env             # variables de entorno con secretos
+
+# Archivos del sistema
+Thumbs.db
+*.log

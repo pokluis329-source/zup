@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ Zuppon Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: #0d0d0d; color: #fff; }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: #000;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #222;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+    .topbar span { color: #FF5722; }
+    .badge {
+      background: #FF5722;
+      color: #fff;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-left: auto;
+    }
+    .dot-live {
+      width: 8px; height: 8px;
+      background: #00E676;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+      margin-left: 8px;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Stats ── */
+    .stats {
+      display: flex;
+      gap: 16px;
+      padding: 20px 28px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: #1f1f1f;
+      border-radius: 16px;
+      padding: 18px 24px;
+      min-width: 140px;
+      flex: 1;
+      border: 1px solid #2a2a2a;
+    }
+    .stat-card .val { font-size: 32px; font-weight: 800; margin-bottom: 4px; }
+    .stat-card .lbl { font-size: 12px; color: #777; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── Orders grid ── */
+    .section-title {
+      padding: 8px 28px 12px;
+      font-size: 14px;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .orders-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+      padding: 0 28px 40px;
+    }
+    .order-card {
+      background: #1f1f1f;
+      border-radius: 18px;
+      padding: 18px;
+      border: 1px solid #2a2a2a;
+      transition: transform .15s;
+      animation: fadeIn .3s ease;
+    }
+    .order-card:hover { transform: translateY(-2px); }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .order-id { font-size: 11px; color: #555; }
+    .status-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .status-PENDING    { background: #2a2a00; color: #FFD600; }
+    .status-ACCEPTED   { background: #1a2a3a; color: #29B6F6; }
+    .status-PICKED_UP  { background: #1a2a1a; color: #66BB6A; }
+    .status-DELIVERING { background: #2a1a00; color: #FFA726; }
+    .status-COMPLETED  { background: #0a2a0a; color: #00E676; }
+    .status-CANCELLED  { background: #2a0a0a; color: #EF5350; }
+
+    .order-items {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    .order-dest {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 5px;
+      align-items: flex-start;
+    }
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #2a2a2a;
+    }
+    .fare { font-size: 16px; font-weight: 800; color: #FFC107; }
+    .time { font-size: 11px; color: #555; }
+    .driver-badge {
+      font-size: 11px;
+      color: #00E676;
+      background: #0a1a0a;
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+
+    /* ── Empty ── */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #444;
+      font-size: 16px;
+    }
+    .empty .emoji { font-size: 48px; margin-bottom: 12px; }
+
+    /* ── Refresh button ── */
+    .refresh-btn {
+      background: #FF5722;
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: opacity .15s;
+    }
+    .refresh-btn:hover { opacity: .85; }
+
+    /* ── Filter tabs ── */
+    .filters {
+      display: flex;
+      gap: 8px;
+      padding: 0 28px 20px;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      background: #1f1f1f;
+      border: 1px solid #333;
+      color: #aaa;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all .15s;
+    }
+    .filter-btn.active, .filter-btn:hover {
+      background: #FF5722;
+      color: #fff;
+      border-color: #FF5722;
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <span style="font-size:22px">⚡</span>
+  <h1>ZUPPON <span>Dashboard</span></h1>
+  <div class="dot-live" title="Actualizando en tiempo real"></div>
+  <div id="last-update" style="font-size:11px;color:#555;margin-left:8px"></div>
+  <a href="/menu" style="margin-left:auto;background:#1f1f1f;border:1px solid #333;color:#aaa;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.background='#FF5722';this.style.color='#fff'" onmouseout="this.style.background='#1f1f1f';this.style.color='#aaa'">🍔 Editor de Menú</a>
+  <button class="refresh-btn" onclick="loadOrders()">↻ Actualizar</button>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat-card">
+    <div class="val" id="stat-total">—</div>
+    <div class="lbl">Total pedidos</div>
+  </div>
+  <div class="stat-card">
+    <div class="val" style="color:#FFD600" id="stat-pending">—</div>
+    <div class="lbl">Pendientes</div>
+  </div>
+  <div class="stat-card">
+    <div class="val" style="color:#00E676" id="stat-completed">—</div>
+    <div class="lbl">Completados</div>
+  </div>
+  <div class="stat-card">
+    <div class="val" style="color:#FFC107" id="stat-revenue">—</div>
+    <div class="lbl">Ingresos (Gs)</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="filters">
+  <button class="filter-btn active" onclick="filterOrders('ALL', this)">Todos</button>
+  <button class="filter-btn" onclick="filterOrders('PENDING', this)">🔍 Pendiente</button>
+  <button class="filter-btn" onclick="filterOrders('ACCEPTED', this)">🛵 Aceptado</button>
+  <button class="filter-btn" onclick="filterOrders('DELIVERING', this)">🍔 En camino</button>
+  <button class="filter-btn" onclick="filterOrders('COMPLETED', this)">✅ Completado</button>
+  <button class="filter-btn" onclick="filterOrders('CANCELLED', this)">❌ Cancelado</button>
+</div>
+
+<div class="section-title" id="orders-count"></div>
+<div class="orders-grid" id="orders-container">
+  <div class="empty"><div class="emoji">🛵</div>Cargando pedidos…</div>
+</div>
+
+<script>
+  let allOrders = [];
+  let currentFilter = 'ALL';
+
+  const STATUS_LABELS = {
+    PENDING:    '🔍 Pendiente',
+    ACCEPTED:   '🛵 Aceptado',
+    PICKED_UP:  '✅ Recogido',
+    DELIVERING: '🍔 En camino',
+    COMPLETED:  '✅ Entregado',
+    CANCELLED:  '❌ Cancelado',
+  };
+
+  function formatGs(fare) {
+    const gs = Math.round(fare * 7300);
+    return 'Gs ' + gs.toLocaleString('es-PY');
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso + 'Z');
+    return d.toLocaleString('es-PY', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+  }
+
+  function renderOrders(orders) {
+    const container = document.getElementById('orders-container');
+    const count = document.getElementById('orders-count');
+
+    if (!orders.length) {
+      container.innerHTML = '<div class="empty"><div class="emoji">📭</div>Sin pedidos con este filtro</div>';
+      count.textContent = '0 pedidos';
+      return;
+    }
+
+    count.textContent = `${orders.length} pedido${orders.length !== 1 ? 's' : ''}`;
+
+    container.innerHTML = orders.map(o => `
+      <div class="order-card">
+        <div class="order-header">
+          <div>
+            <div style="font-size:11px;color:#555">Pedido #${o.id}</div>
+            <div style="font-size:11px;color:#777;margin-top:2px">${o.client_name}</div>
+          </div>
+          <span class="status-pill status-${o.status}">${STATUS_LABELS[o.status] || o.status}</span>
+        </div>
+
+        <div class="order-items">🍔 ${o.items}</div>
+        <div class="order-dest">📍 <span>${o.destination}</span></div>
+
+        ${o.driver_name ? `<div class="driver-badge">🛵 ${o.driver_name} · ${o.driver_vehicle || ''}</div>` : ''}
+
+        <div class="order-footer">
+          <div class="fare">${formatGs(o.fare)}</div>
+          <div class="time">${formatTime(o.created_at)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function filterOrders(status, btn) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filtered = status === 'ALL' ? allOrders : allOrders.filter(o => o.status === status);
+    renderOrders(filtered);
+  }
+
+  function updateStats(orders) {
+    document.getElementById('stat-total').textContent = orders.length;
+    document.getElementById('stat-pending').textContent =
+      orders.filter(o => ['PENDING','ACCEPTED','PICKED_UP','DELIVERING'].includes(o.status)).length;
+    document.getElementById('stat-completed').textContent =
+      orders.filter(o => o.status === 'COMPLETED').length;
+    const revenue = orders
+      .filter(o => o.status === 'COMPLETED')
+      .reduce((s, o) => s + (o.fare_gs || Math.round(o.fare * 7300)), 0);
+    document.getElementById('stat-revenue').textContent =
+      revenue > 0 ? 'Gs ' + revenue.toLocaleString('es-PY') : '0';
+  }
+
+  async function loadOrders() {
+    try {
+      const res = await fetch('/api/orders');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      allOrders = await res.json();
+      updateStats(allOrders);
+      const filtered = currentFilter === 'ALL' ? allOrders : allOrders.filter(o => o.status === currentFilter);
+      renderOrders(filtered);
+      document.getElementById('last-update').textContent =
+        'actualizado ' + new Date().toLocaleTimeString('es-PY');
+    } catch (e) {
+      document.getElementById('orders-container').innerHTML =
+        `<div class="empty"><div class="emoji">⚠️</div>Error al cargar: ${e.message}</div>`;
+    }
+  }
+
+  // Cargar al inicio y actualizar cada 5 segundos
+  loadOrders();
+  setInterval(loadOrders, 5000);
+</script>
+</body>
+</html>

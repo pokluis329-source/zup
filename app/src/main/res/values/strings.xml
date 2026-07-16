@@ -1,0 +1,62 @@
+<resources>
+    <string name="app_name">Zuppon</string>
+
+    <string name="google_maps_key" translatable="false">AIzaSyAh7KqR2hw0DZ3MFQq1jUDzPVtYv3xVwKk</string>
+
+    <!-- Navigation drawer -->
+    <string name="nav_header_title">Zuppon</string>
+    <string name="nav_header_subtitle">zuppon@example.com</string>
+    <string name="nav_header_desc">Encabezado de navegación</string>
+    <string name="menu_home">Inicio</string>
+    <string name="menu_gallery">Galería</string>
+    <string name="menu_slideshow">Presentación</string>
+    <string name="action_settings">Ajustes</string>
+
+    <!-- Role selection -->
+    <string name="select_role">¿quién eres hoy?</string>
+    <string name="role_passenger">Cliente</string>
+    <string name="role_driver">Repartidor</string>
+    <string name="role_passenger_desc">tengo hambre · pide ya</string>
+    <string name="role_driver_desc">gana dinero · sal a repartir</string>
+
+    <!-- Customer -->
+    <string name="passenger_home">¿qué vas a pedir?</string>
+    <string name="where_to">¿qué se te antoja? 🤤</string>
+    <string name="origin_hint">restaurante o local</string>
+    <string name="destination_hint">¿a dónde te lo llevamos?</string>
+    <string name="request_ride">🔥 ¡Pedir ahora!</string>
+    <string name="cancel_ride">cancelar pedido</string>
+    <string name="searching_driver">buscando al héroe de tu hambre…</string>
+    <string name="driver_found">¡repartidor encontrado! 🙌</string>
+    <string name="driver_on_way">el repartidor va en camino</string>
+    <string name="trip_in_progress">tu comida viene volando 🛵💨</string>
+    <string name="trip_completed">¡llegó tu pedido! 🎉</string>
+    <string name="rate_driver">¿cómo te fue? dale una estrella</string>
+    <string name="new_trip">pedir otra vez 😋</string>
+    <string name="estimated_price">total 💵</string>
+    <string name="estimated_time">llega en ⏱</string>
+
+    <!-- Courier -->
+    <string name="driver_home">Panel Repartidor</string>
+    <string name="go_online">🟢 Empezar a ganar</string>
+    <string name="go_offline">desconectarse</string>
+    <string name="status_offline">desconectado</string>
+    <string name="status_online">en línea · esperando pedidos ⚡</string>
+    <string name="status_request">¡nuevo pedido! 🔔</string>
+    <string name="accept_trip">✅ Aceptar</string>
+    <string name="reject_trip">Rechazar</string>
+    <string name="arrive_passenger">🍔 Recogí el pedido</string>
+    <string name="start_trip">🛵 Salir a entregar</string>
+    <string name="end_trip">✅ Entrega completada</string>
+    <string name="trips_today">pedidos hoy</string>
+    <string name="earnings_today">ganancias 💰</string>
+    <string name="passenger_name">cliente</string>
+    <string name="passenger_destination">dirección de entrega</string>
+    <string name="trip_fare">tarifa</string>
+
+    <!-- Common -->
+    <string name="back">Atrás</string>
+    <string name="change_role">Cambiar rol</string>
+    <string name="min">min</string>
+    <string name="currency_symbol">$</string>
+</resources>

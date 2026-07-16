@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/zuppon_primary">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- ══════════════════════════════════════
+             HERO — foto real + gradiente
+             ══════════════════════════════════════ -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="260dp">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_hero_gradient" />
+
+            <ImageView
+                android:id="@+id/iv_welcome_photo"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Comida deliciosa" />
+
+            <!-- Emojis flotantes decorativos -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🍕" android:textSize="64sp" android:alpha="0.22"
+                android:rotation="-18" android:layout_gravity="top|end"
+                android:layout_marginTop="8dp" android:layout_marginEnd="8dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🌮" android:textSize="52sp" android:alpha="0.18"
+                android:rotation="15" android:layout_gravity="bottom|start"
+                android:layout_marginBottom="50dp" android:layout_marginStart="16dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🍜" android:textSize="44sp" android:alpha="0.15"
+                android:rotation="-8" android:layout_gravity="top|start"
+                android:layout_marginTop="40dp" android:layout_marginStart="24dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🧃" android:textSize="38sp" android:alpha="0.15"
+                android:rotation="12" android:layout_gravity="center|end"
+                android:layout_marginEnd="20dp" />
+
+            <!-- Overlay bottom -->
+            <View android:layout_width="match_parent" android:layout_height="110dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/bg_gradient_bottom_dark" />
+
+            <!-- Logo pill -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="18dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_black_pill"
+                android:paddingStart="14dp" android:paddingEnd="14dp"
+                android:paddingTop="8dp" android:paddingBottom="8dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="⚡" android:textSize="16sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="ZUPPON" android:textColor="@color/white"
+                    android:textSize="18sp" android:textStyle="bold"
+                    android:letterSpacing="0.1" android:layout_marginStart="5dp" />
+            </LinearLayout>
+
+            <!-- Tagline -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:orientation="vertical"
+                android:paddingStart="22dp" android:paddingEnd="22dp"
+                android:paddingBottom="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Tu mejor lugar para ordenar. 🍔"
+                    android:textColor="@color/white" android:textSize="28sp" android:textStyle="bold"
+                    android:shadowColor="#66000000" android:shadowDx="0" android:shadowDy="2" android:shadowRadius="8" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="rápido, fácil y a tu puerta. 🛵"
+                    android:textColor="#DDFFFFFF" android:textSize="15sp" android:layout_marginTop="2dp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- ══════════════════════════════════════
+             STATS
+             ══════════════════════════════════════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@color/zuppon_surface"
+            android:paddingTop="14dp" android:paddingBottom="14dp"
+            android:paddingStart="8dp" android:paddingEnd="8dp">
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="4.9 ⭐" android:textColor="@color/zuppon_yellow"
+                    android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="rating" android:textColor="@color/zuppon_text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <View android:layout_width="1dp" android:layout_height="32dp"
+                android:background="@color/zuppon_divider_bright" />
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="~20 min 🛵" android:textColor="@color/zuppon_accent"
+                    android:textSize="17sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="entrega" android:textColor="@color/zuppon_text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <View android:layout_width="1dp" android:layout_height="32dp"
+                android:background="@color/zuppon_divider_bright" />
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="24/7 🌙" android:textColor="@color/zuppon_green"
+                    android:textSize="17sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="abierto" android:textColor="@color/zuppon_text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ══════════════════════════════════════
+             SALUDO + NOMBRE
+             ══════════════════════════════════════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="24dp" android:paddingEnd="24dp"
+            android:paddingTop="28dp" android:paddingBottom="0dp">
+
+            <TextView
+                android:id="@+id/tv_select_role"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="¿qué se te antoja hoy? 🤤"
+                android:textColor="@color/white"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="escoge tu comida favorita y la llevamos directo a ti"
+                android:textColor="@color/zuppon_text_secondary"
+                android:textSize="13sp"
+                android:lineSpacingMultiplier="1.4"
+                android:layout_marginBottom="20dp" />
+
+            <!-- CTA full width — Cliente -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/card_passenger"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                app:cardBackgroundColor="@color/zuppon_accent"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="20dp">
+                    <FrameLayout
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginEnd="16dp">
+                        <View android:layout_width="match_parent" android:layout_height="match_parent"
+                            android:background="@drawable/bg_black_pill" android:alpha="0.3" />
+                        <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                            android:gravity="center" android:text="🍔" android:textSize="30sp" />
+                    </FrameLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="¡Quiero comer!" android:textColor="@color/white"
+                            android:textSize="18sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="ver el menú completo 🍕🌮🍝"
+                            android:textColor="#CCFFFFFF" android:textSize="12sp" android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="→" android:textColor="@color/white"
+                        android:textSize="22sp" android:textStyle="bold" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- CTA Conductor -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/card_driver"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="@color/zuppon_card"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="20dp">
+                    <FrameLayout
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginEnd="16dp">
+                        <View android:layout_width="match_parent" android:layout_height="match_parent"
+                            android:background="@drawable/bg_green_pill" />
+                        <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                            android:gravity="center" android:text="🛵" android:textSize="30sp" />
+                    </FrameLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Soy Repartidor" android:textColor="@color/white"
+                            android:textSize="18sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="ver pedidos y empezar a ganar 💰"
+                            android:textColor="@color/zuppon_text_secondary" android:textSize="12sp"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="→" android:textColor="@color/zuppon_green"
+                        android:textSize="22sp" android:textStyle="bold" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+        </LinearLayout>
+
+        <!-- ══════════════════════════════════════
+             LO QUE ESTÁ DE MODA
+             ══════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="  🔥 lo que está pidiendo la gente"
+            android:textColor="@color/zuppon_text_secondary"
+            android:textSize="13sp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginBottom="32dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp">
+
+                <FrameLayout android:layout_width="110dp" android:layout_height="110dp"
+                    android:layout_marginEnd="12dp">
+                    <View android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@drawable/bg_food_burger" />
+                    <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:gravity="center" android:text="🍔" android:textSize="48sp" />
+                    <View android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_gravity="bottom" android:background="@drawable/bg_gradient_bottom_dark" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_gravity="bottom" android:text="Burgers 🔥"
+                        android:textColor="@color/white" android:textSize="11sp" android:textStyle="bold"
+                        android:gravity="center" android:paddingBottom="6dp" />
+                </FrameLayout>
+
+                <FrameLayout android:layout_width="110dp" android:layout_height="110dp"
+                    android:layout_marginEnd="12dp">
+                    <View android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@drawable/bg_food_pizza" />
+                    <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:gravity="center" android:text="🍕" android:textSize="48sp" />
+                    <View android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_gravity="bottom" android:background="@drawable/bg_gradient_bottom_dark" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_gravity="bottom" android:text="Pizzas ⭐"
+                        android:textColor="@color/white" android:textSize="11sp" android:textStyle="bold"
+                        android:gravity="center" android:paddingBottom="6dp" />
+                </FrameLayout>
+
+                <FrameLayout android:layout_width="110dp" android:layout_height="110dp"
+                    android:layout_marginEnd="12dp">
+                    <View android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@drawable/bg_food_taco" />
+                    <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:gravity="center" android:text="🌮" android:textSize="48sp" />
+                    <View android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_gravity="bottom" android:background="@drawable/bg_gradient_bottom_dark" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_gravity="bottom" android:text="Tacos 💥"
+                        android:textColor="@color/white" android:textSize="11sp" android:textStyle="bold"
+                        android:gravity="center" android:paddingBottom="6dp" />
+                </FrameLayout>
+
+                <FrameLayout android:layout_width="110dp" android:layout_height="110dp"
+                    android:layout_marginEnd="12dp">
+                    <View android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@drawable/bg_food_pasta" />
+                    <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:gravity="center" android:text="🍝" android:textSize="48sp" />
+                    <View android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_gravity="bottom" android:background="@drawable/bg_gradient_bottom_dark" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_gravity="bottom" android:text="Pastas 🤌"
+                        android:textColor="@color/white" android:textSize="11sp" android:textStyle="bold"
+                        android:gravity="center" android:paddingBottom="6dp" />
+                </FrameLayout>
+
+                <FrameLayout android:layout_width="110dp" android:layout_height="110dp"
+                    android:layout_marginEnd="12dp">
+                    <View android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@drawable/bg_food_salad" />
+                    <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:gravity="center" android:text="🥗" android:textSize="48sp" />
+                    <View android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_gravity="bottom" android:background="@drawable/bg_gradient_bottom_dark" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_gravity="bottom" android:text="Ensaladas 🥑"
+                        android:textColor="@color/white" android:textSize="11sp" android:textStyle="bold"
+                        android:gravity="center" android:paddingBottom="6dp" />
+                </FrameLayout>
+
+                <FrameLayout android:layout_width="110dp" android:layout_height="110dp">
+                    <View android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@drawable/bg_food_drink" />
+                    <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:gravity="center" android:text="🥤" android:textSize="48sp" />
+                    <View android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_gravity="bottom" android:background="@drawable/bg_gradient_bottom_dark" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_gravity="bottom" android:text="Bebidas 🧃"
+                        android:textColor="@color/white" android:textSize="11sp" android:textStyle="bold"
+                        android:gravity="center" android:paddingBottom="6dp" />
+                </FrameLayout>
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/tv_version"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Zuppon v2.0 · hecho con 🔥 y mucha hambre"
+            android:textColor="@color/zuppon_text_hint"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:layout_marginBottom="28dp" />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

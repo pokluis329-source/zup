@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <application
+        android:name=".ZupponApp"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Zuppon"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="31">
+
+        <!-- Google Maps API Key — reemplazar con tu key de Google Cloud Console -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
+
+        <!-- SPLASH / Onboarding — launcher -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Zuppon">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Bienvenida -->
+        <activity
+            android:name=".RoleSelectionActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Zuppon" />
+
+        <!-- Menú cliente -->
+        <activity
+            android:name=".ui.passenger.PassengerActivity"
+            android:exported="false"
+            android:label="@string/passenger_home"
+            android:theme="@style/Theme.Zuppon"
+            android:launchMode="singleTop" />
+
+        <!-- Detalle de producto -->
+        <activity
+            android:name=".ui.passenger.ProductDetailActivity"
+            android:exported="false"
+            android:label="Detalle del producto"
+            android:theme="@style/Theme.Zuppon" />
+
+        <!-- Selector de ubicación personalizada -->
+        <activity
+            android:name=".ui.passenger.PickLocationActivity"
+            android:exported="false"
+            android:label="Elegir ubicación"
+            android:theme="@style/Theme.Zuppon" />
+
+        <!-- Panel Repartidor -->
+        <activity
+            android:name=".ui.driver.DriverActivity"
+            android:exported="false"
+            android:label="@string/driver_home"
+            android:theme="@style/Theme.Zuppon"
+            android:launchMode="singleTop" />
+
+        <!-- Legacy -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Zuppon.NoActionBar" />
+
+    </application>
+
+</manifest>

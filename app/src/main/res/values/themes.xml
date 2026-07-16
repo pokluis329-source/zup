@@ -1,0 +1,75 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Zuppon" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/zuppon_accent</item>
+        <item name="colorPrimaryVariant">@color/zuppon_accent_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/zuppon_yellow</item>
+        <item name="colorSecondaryVariant">@color/zuppon_accent_dark</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="android:statusBarColor">@color/zuppon_primary_dark</item>
+        <item name="android:windowBackground">@color/zuppon_primary</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <!-- Eliminar animaciones de ventana del sistema — navegación instantánea -->
+        <item name="android:windowAnimationStyle">@style/NoWindowAnimation</item>
+    </style>
+
+    <!-- Sin animaciones de ventana — transición instantánea -->
+    <style name="NoWindowAnimation">
+        <item name="android:activityOpenEnterAnimation">@null</item>
+        <item name="android:activityOpenExitAnimation">@null</item>
+        <item name="android:activityCloseEnterAnimation">@null</item>
+        <item name="android:activityCloseExitAnimation">@null</item>
+        <item name="android:taskOpenEnterAnimation">@null</item>
+        <item name="android:taskOpenExitAnimation">@null</item>
+        <item name="android:taskCloseEnterAnimation">@null</item>
+        <item name="android:taskCloseExitAnimation">@null</item>
+    </style>
+
+    <style name="Theme.Zuppon.NoActionBar" parent="Theme.Zuppon">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme.Zuppon.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+    <style name="Theme.Zuppon.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+    <!-- Pill button — neon orange, pill shape -->
+    <style name="ZupponButton" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/zuppon_accent</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">16dp</item>
+        <item name="cornerRadius">30dp</item>
+        <item name="android:letterSpacing">0.03</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="ZupponButtonGreen" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/zuppon_green</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">16dp</item>
+        <item name="cornerRadius">30dp</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="ZupponButtonOutline" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="strokeColor">@color/zuppon_divider_bright</item>
+        <item name="android:textColor">@color/zuppon_text_secondary</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingBottom">16dp</item>
+        <item name="cornerRadius">30dp</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="ZupponCard" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/zuppon_card</item>
+        <item name="cardCornerRadius">20dp</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+</resources>

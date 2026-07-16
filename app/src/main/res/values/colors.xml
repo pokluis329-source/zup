@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ── Zuppon 2.0 palette ── dark base + electric orange/yellow neon -->
+    <color name="zuppon_primary">#FF0D0D0D</color>
+    <color name="zuppon_primary_dark">#FF000000</color>
+    <color name="zuppon_surface">#FF161616</color>
+    <color name="zuppon_card">#FF1F1F1F</color>
+    <color name="zuppon_card_2">#FF2A2A2A</color>
+
+    <!-- Neon orange accent — the brand pop -->
+    <color name="zuppon_accent">#FFFF5722</color>
+    <color name="zuppon_accent_dark">#FFE64A19</color>
+    <color name="zuppon_accent_glow">#33FF5722</color>
+
+    <!-- Electric yellow for prices / highlights -->
+    <color name="zuppon_yellow">#FFFFC107</color>
+    <color name="zuppon_yellow_soft">#22FFC107</color>
+
+    <!-- Green for online / success -->
+    <color name="zuppon_green">#FF00E676</color>
+    <color name="zuppon_green_dark">#FF00C853</color>
+    <color name="zuppon_green_glow">#2200E676</color>
+
+    <!-- Text -->
+    <color name="zuppon_text_primary">#FFFFFFFF</color>
+    <color name="zuppon_text_secondary">#FF9E9E9E</color>
+    <color name="zuppon_text_hint">#FF616161</color>
+
+    <!-- Divider / borders -->
+    <color name="zuppon_divider">#FF2C2C2C</color>
+    <color name="zuppon_divider_bright">#FF3A3A3A</color>
+
+    <!-- Misc -->
+    <color name="zuppon_orange">#FFFF9800</color>
+    <color name="zuppon_red_soft">#33FF5722</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- Legacy -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+</resources>

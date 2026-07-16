@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ Zuppon — Editor de Menú</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: #0d0d0d; color: #fff; }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: #000; padding: 16px 28px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid #222;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar h1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+    .topbar h1 span { color: #FF5722; }
+    .nav-link {
+      margin-left: auto; background: #1f1f1f; border: 1px solid #333;
+      color: #aaa; padding: 7px 16px; border-radius: 20px;
+      cursor: pointer; font-size: 13px; text-decoration: none;
+      transition: all .15s;
+    }
+    .nav-link:hover { background: #FF5722; color: #fff; border-color: #FF5722; }
+
+    /* ── Barra de acciones ── */
+    .actions {
+      display: flex; align-items: center; gap: 12px;
+      padding: 20px 28px; flex-wrap: wrap;
+    }
+    .btn-new {
+      background: #FF5722; color: #fff; border: none;
+      padding: 10px 22px; border-radius: 24px; font-size: 14px;
+      font-weight: 700; cursor: pointer; transition: opacity .15s;
+    }
+    .btn-new:hover { opacity: .85; }
+    .search-box {
+      background: #1f1f1f; border: 1px solid #333; color: #fff;
+      padding: 9px 16px; border-radius: 24px; font-size: 14px; width: 260px;
+    }
+    .search-box::placeholder { color: #555; }
+    .cat-filter {
+      background: #1f1f1f; border: 1px solid #333; color: #aaa;
+      padding: 9px 14px; border-radius: 24px; font-size: 13px; cursor: pointer;
+      transition: all .15s;
+    }
+    .cat-filter.active, .cat-filter:hover { background: #FF5722; color: #fff; border-color: #FF5722; }
+    .item-count { margin-left: auto; font-size: 12px; color: #555; }
+
+    /* ── Tabla ── */
+    .table-wrap { padding: 0 28px 60px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left; font-size: 11px; color: #555;
+      text-transform: uppercase; letter-spacing: .5px;
+      padding: 10px 12px; border-bottom: 1px solid #222;
+    }
+    tbody tr {
+      border-bottom: 1px solid #1a1a1a;
+      transition: background .1s;
+      animation: fadeIn .25s ease;
+    }
+    tbody tr:hover { background: #161616; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+    td { padding: 12px 12px; font-size: 14px; vertical-align: middle; }
+
+    .td-emoji { font-size: 22px; width: 44px; text-align: center; }
+    .td-name { font-weight: 600; max-width: 180px; }
+    .td-desc { color: #666; font-size: 12px; max-width: 220px;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-price { color: #00E676; font-weight: 700; white-space: nowrap; }
+    .td-cat { color: #aaa; font-size: 12px; white-space: nowrap; }
+
+    .badge-popular {
+      background: #FF5722; color: #fff; font-size: 10px;
+      font-weight: 700; padding: 2px 8px; border-radius: 12px; white-space: nowrap;
+    }
+    .badge-inactive {
+      background: #2a2a2a; color: #555; font-size: 10px;
+      font-weight: 700; padding: 2px 8px; border-radius: 12px;
+    }
+
+    .td-actions { display: flex; gap: 8px; white-space: nowrap; }
+    .btn-edit {
+      background: #1f1f1f; border: 1px solid #333; color: #aaa;
+      padding: 5px 14px; border-radius: 16px; font-size: 12px; cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-edit:hover { background: #29B6F6; color: #000; border-color: #29B6F6; }
+    .btn-del {
+      background: #1f1f1f; border: 1px solid #333; color: #aaa;
+      padding: 5px 14px; border-radius: 16px; font-size: 12px; cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-del:hover { background: #ef5350; color: #fff; border-color: #ef5350; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.75); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px;
+      padding: 28px; width: 100%; max-width: 480px; max-height: 90vh;
+      overflow-y: auto; animation: popIn .2s ease;
+    }
+    @keyframes popIn { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
+    .modal h2 { font-size: 18px; margin-bottom: 20px; }
+    .modal h2 span { color: #FF5722; }
+
+    .form-row { margin-bottom: 16px; }
+    .form-row label { display: block; font-size: 11px; color: #666;
+                      text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .form-row input, .form-row textarea, .form-row select {
+      width: 100%; background: #0d0d0d; border: 1px solid #2a2a2a;
+      color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px;
+    }
+    .form-row input:focus, .form-row textarea:focus, .form-row select:focus {
+      outline: none; border-color: #FF5722;
+    }
+    .form-row textarea { resize: vertical; min-height: 72px; }
+    .form-row select option { background: #1a1a1a; }
+
+    .form-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .form-check { display: flex; align-items: center; gap: 10px; }
+    .form-check input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: #FF5722; }
+    .form-check label { font-size: 14px; color: #aaa; cursor: pointer; text-transform: none; letter-spacing: 0; }
+
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .btn-cancel {
+      background: #2a2a2a; border: none; color: #aaa;
+      padding: 10px 22px; border-radius: 24px; font-size: 14px; cursor: pointer;
+    }
+    .btn-save {
+      background: #FF5722; border: none; color: #fff;
+      padding: 10px 28px; border-radius: 24px; font-size: 14px;
+      font-weight: 700; cursor: pointer; transition: opacity .15s;
+    }
+    .btn-save:hover { opacity: .85; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      background: #1f1f1f; border: 1px solid #333; color: #fff;
+      padding: 12px 24px; border-radius: 24px; font-size: 14px;
+      opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 300;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ── Confirm dialog ── */
+    .confirm-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.75); z-index: 300;
+      align-items: center; justify-content: center;
+    }
+    .confirm-overlay.open { display: flex; }
+    .confirm-box {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px;
+      padding: 24px; width: 320px; text-align: center;
+    }
+    .confirm-box p { margin-bottom: 20px; color: #aaa; }
+    .confirm-box .item-name { color: #fff; font-weight: 700; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+    .btn-confirm-del {
+      background: #ef5350; border: none; color: #fff;
+      padding: 9px 22px; border-radius: 20px; font-size: 14px; cursor: pointer;
+    }
+    .btn-confirm-cancel {
+      background: #2a2a2a; border: none; color: #aaa;
+      padding: 9px 22px; border-radius: 20px; font-size: 14px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <span style="font-size:22px">⚡</span>
+  <h1>ZUPPON <span>Menú</span></h1>
+  <a class="nav-link" href="/dashboard">← Dashboard</a>
+</div>
+
+<!-- Acciones -->
+<div class="actions">
+  <button class="btn-new" onclick="openCreate()">+ Nuevo item</button>
+  <input class="search-box" type="text" id="search" placeholder="Buscar por nombre…" oninput="renderTable()">
+  <div id="cat-filters"></div>
+  <span class="item-count" id="item-count"></span>
+</div>
+
+<!-- Tabla -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>Nombre</th>
+        <th>Descripción</th>
+        <th>Precio</th>
+        <th>Categoría</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="menu-tbody"></tbody>
+  </table>
+</div>
+
+<!-- Modal editar / crear -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBg(event)">
+  <div class="modal">
+    <h2 id="modal-title">Nuevo item <span>del menú</span></h2>
+    <input type="hidden" id="field-id">
+
+    <div class="form-two">
+      <div class="form-row">
+        <label>Emoji</label>
+        <input type="text" id="field-emoji" maxlength="4" placeholder="🍔">
+      </div>
+      <div class="form-row">
+        <label>Nombre *</label>
+        <input type="text" id="field-name" placeholder="Burger Clásica">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Descripción</label>
+      <textarea id="field-desc" placeholder="Ingredientes o descripción breve…"></textarea>
+    </div>
+
+    <div class="form-two">
+      <div class="form-row">
+        <label>Precio (USD) *</label>
+        <input type="number" id="field-price" step="0.50" min="0" placeholder="8.50">
+      </div>
+      <div class="form-row">
+        <label>Imagen (asset)</label>
+        <select id="field-image">
+          <option value="">— ninguna —</option>
+          <option value="burger.webp">burger.webp</option>
+          <option value="bbqburger.webp">bbqburger.webp</option>
+          <option value="pizza.webp">pizza.webp</option>
+          <option value="tacos.webp">tacos.webp</option>
+          <option value="pasta.webp">pasta.webp</option>
+          <option value="lasagna.webp">lasagna.webp</option>
+          <option value="salad.webp">salad.webp</option>
+          <option value="drink.webp">drink.webp</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Categoría</label>
+      <select id="field-category">
+        <option>🔥 Populares</option>
+        <option>🍔 Hamburguesas</option>
+        <option>🍕 Pizzas</option>
+        <option>🌮 Tacos</option>
+        <option>🍜 Pastas</option>
+        <option>🥗 Ensaladas</option>
+        <option>🥤 Bebidas</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-check">
+        <input type="checkbox" id="field-popular">
+        <label for="field-popular">⭐ Marcar como popular</label>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-check">
+        <input type="checkbox" id="field-active" checked>
+        <label for="field-active">✅ Item activo (visible en la app)</label>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" onclick="saveItem()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm delete -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <p>¿Eliminar <span class="item-name" id="confirm-name"></span>?<br>Esta acción no se puede deshacer.</p>
+    <div class="confirm-actions">
+      <button class="btn-confirm-cancel" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn-confirm-del" id="btn-confirm-del">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  let allItems = [];
+  let activeCategory = 'Todos';
+
+  // ── Carga inicial ──────────────────────────────────────────────────────────
+  async function loadMenu() {
+    const res = await fetch('/api/menu');
+    allItems = await res.json();
+    buildCategoryFilters();
+    renderTable();
+  }
+
+  // ── Filtros de categoría ───────────────────────────────────────────────────
+  function buildCategoryFilters() {
+    const cats = ['Todos', ...new Set(allItems.map(i => i.category))];
+    const wrap = document.getElementById('cat-filters');
+    wrap.innerHTML = cats.map(c =>
+      `<button class="cat-filter ${c === activeCategory ? 'active' : ''}"
+               onclick="setCategory('${c.replace(/'/g, "\\'")}')">${c}</button>`
+    ).join('');
+  }
+
+  function setCategory(cat) {
+    activeCategory = cat;
+    buildCategoryFilters();
+    renderTable();
+  }
+
+  // ── Render de la tabla ─────────────────────────────────────────────────────
+  function renderTable() {
+    const query  = document.getElementById('search').value.toLowerCase();
+    const items  = allItems.filter(i => {
+      const matchCat  = activeCategory === 'Todos' || i.category === activeCategory;
+      const matchText = !query || i.name.toLowerCase().includes(query)
+                               || i.description.toLowerCase().includes(query);
+      return matchCat && matchText;
+    });
+
+    document.getElementById('item-count').textContent = `${items.length} items`;
+
+    const tbody = document.getElementById('menu-tbody');
+    if (items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#444;padding:40px">Sin resultados</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = items.map(item => `
+      <tr>
+        <td class="td-emoji">${item.emoji}</td>
+        <td class="td-name">${esc(item.name)}</td>
+        <td class="td-desc">${esc(item.description)}</td>
+        <td class="td-price">
+          $${item.price.toFixed(2)}<br>
+          <small style="color:#555">Gs ${item.price_gs.toLocaleString('es-PY')}</small>
+        </td>
+        <td class="td-cat">${esc(item.category)}</td>
+        <td>
+          ${item.is_popular  ? '<span class="badge-popular">⭐ Popular</span>' : ''}
+          ${!item.is_active  ? '<span class="badge-inactive">Inactivo</span>'  : ''}
+        </td>
+        <td class="td-actions">
+          <button class="btn-edit" onclick="openEdit(${item.id})">✏️ Editar</button>
+          <button class="btn-del"  onclick="confirmDelete(${item.id}, '${esc(item.name)}')">🗑 Eliminar</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── Modal crear ────────────────────────────────────────────────────────────
+  function openCreate() {
+    document.getElementById('modal-title').innerHTML = 'Nuevo item <span>del menú</span>';
+    document.getElementById('field-id').value       = '';
+    document.getElementById('field-emoji').value    = '🍔';
+    document.getElementById('field-name').value     = '';
+    document.getElementById('field-desc').value     = '';
+    document.getElementById('field-price').value    = '';
+    document.getElementById('field-image').value    = '';
+    document.getElementById('field-category').value = '🔥 Populares';
+    document.getElementById('field-popular').checked = false;
+    document.getElementById('field-active').checked  = true;
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+
+  // ── Modal editar ───────────────────────────────────────────────────────────
+  function openEdit(id) {
+    const item = allItems.find(i => i.id === id);
+    if (!item) return;
+    document.getElementById('modal-title').innerHTML = 'Editar item <span>del menú</span>';
+    document.getElementById('field-id').value       = item.id;
+    document.getElementById('field-emoji').value    = item.emoji;
+    document.getElementById('field-name').value     = item.name;
+    document.getElementById('field-desc').value     = item.description;
+    document.getElementById('field-price').value    = item.price;
+    document.getElementById('field-image').value    = item.asset_image;
+    document.getElementById('field-category').value = item.category;
+    document.getElementById('field-popular').checked = item.is_popular;
+    document.getElementById('field-active').checked  = item.is_active;
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+  function closeModalOnBg(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  }
+
+  // ── Guardar ────────────────────────────────────────────────────────────────
+  async function saveItem() {
+    const id    = document.getElementById('field-id').value;
+    const name  = document.getElementById('field-name').value.trim();
+    const price = parseFloat(document.getElementById('field-price').value);
+
+    if (!name)       { showToast('⚠️ El nombre es obligatorio'); return; }
+    if (isNaN(price) || price < 0) { showToast('⚠️ Precio inválido'); return; }
+
+    const body = {
+      emoji:       document.getElementById('field-emoji').value.trim() || '🍔',
+      name,
+      description: document.getElementById('field-desc').value.trim(),
+      price,
+      asset_image: document.getElementById('field-image').value,
+      category:    document.getElementById('field-category').value,
+      is_popular:  document.getElementById('field-popular').checked,
+      is_active:   document.getElementById('field-active').checked,
+    };
+
+    const url    = id ? `/api/menu/${id}` : '/api/menu';
+    const method = id ? 'PUT' : 'POST';
+    const res    = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (res.ok) {
+      const saved = await res.json();
+      if (id) {
+        const idx = allItems.findIndex(i => i.id === saved.id);
+        if (idx >= 0) allItems[idx] = saved;
+      } else {
+        allItems.unshift(saved);
+      }
+      closeModal();
+      buildCategoryFilters();
+      renderTable();
+      showToast(id ? '✅ Item actualizado' : '✅ Item creado');
+    } else {
+      showToast('❌ Error al guardar');
+    }
+  }
+
+  // ── Eliminar ───────────────────────────────────────────────────────────────
+  let pendingDeleteId = null;
+
+  function confirmDelete(id, name) {
+    pendingDeleteId = id;
+    document.getElementById('confirm-name').textContent = name;
+    document.getElementById('confirm-overlay').classList.add('open');
+  }
+
+  function closeConfirm() {
+    pendingDeleteId = null;
+    document.getElementById('confirm-overlay').classList.remove('open');
+  }
+
+  document.getElementById('btn-confirm-del').onclick = async () => {
+    if (!pendingDeleteId) return;
+    const res = await fetch(`/api/menu/${pendingDeleteId}`, { method: 'DELETE' });
+    if (res.ok) {
+      allItems = allItems.filter(i => i.id !== pendingDeleteId);
+      closeConfirm();
+      buildCategoryFilters();
+      renderTable();
+      showToast('🗑 Item eliminado');
+    } else {
+      showToast('❌ Error al eliminar');
+    }
+  };
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  let toastTimer = null;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  loadMenu();
+</script>
+</body>
+</html>
