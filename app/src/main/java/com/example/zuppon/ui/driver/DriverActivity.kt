@@ -148,7 +148,6 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             if (viewModel.driverStatus.value != DriverStatus.ONLINE) return@observe
 
             val items = orders.map { req ->
-                // Encontrar el server ID en el mapa del repository
                 val serverId = TripRepository.getServerIdForRequest(req)
                 PendingOrderItem(serverId = serverId, request = req)
             }.filter { it.serverId != -1 }
@@ -156,12 +155,12 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             pendingAdapter.submitList(items)
 
             val hasPending = items.isNotEmpty()
-            binding.tvOrdersAvailable.visibility  = if (hasPending) View.VISIBLE else View.GONE
-            binding.rvPendingOrders.visibility    = if (hasPending) View.VISIBLE else View.GONE
-            binding.layoutWaiting.visibility      = if (hasPending) View.GONE   else View.VISIBLE
+            binding.tvOrdersAvailable.visibility = if (hasPending) View.VISIBLE else View.GONE
+            binding.rvPendingOrders.visibility   = if (hasPending) View.VISIBLE else View.GONE
+            binding.layoutWaiting.visibility     = if (hasPending) View.GONE   else View.VISIBLE
 
-            // Dibujar markers en el mapa para todos los pedidos disponibles
-            if (hasPending) updateOrderMarkersOnMap(orders)
+            // Siempre actualizar markers — si la lista está vacía limpia los anteriores
+            updateOrderMarkersOnMap(orders)
         }
 
         viewModel.tripStep.observe(this) { step ->
@@ -190,15 +189,21 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
     // ── Markers de pedidos disponibles en el mapa ─────────────────────────────
 
     private val orderMarkers = mutableListOf<Marker>()
+    // Última lista conocida — para redibujar cuando el mapa se inicialice tarde
+    private var lastKnownPendingOrders: List<TripRequest> = emptyList()
 
     private fun updateOrderMarkersOnMap(orders: List<TripRequest>) {
-        val map = driverMap ?: return
+        lastKnownPendingOrders = orders
+        val map = driverMap ?: return  // se llamará de nuevo desde onMapReady
+
         // Quitar markers viejos
         orderMarkers.forEach { it.remove() }
         orderMarkers.clear()
 
-        orders.forEach { req ->
-            if (!req.hasCoords) return@forEach
+        val withCoords = orders.filter { it.hasCoords }
+        if (withCoords.isEmpty()) return
+
+        withCoords.forEach { req ->
             val dest = LatLng(req.destLat, req.destLng)
             val marker = map.addMarker(
                 MarkerOptions()
@@ -209,6 +214,28 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                     .zIndex(3f)
             )
             if (marker != null) orderMarkers.add(marker)
+        }
+
+        // Si solo hay un pedido con coords, centrar el mapa en él para que sea visible
+        if (withCoords.size == 1) {
+            val single = withCoords.first()
+            val dest = LatLng(single.destLat, single.destLng)
+            val driverPos = driverMarker?.position
+            if (driverPos != null) {
+                val bounds = com.google.android.gms.maps.model.LatLngBounds.Builder()
+                    .include(driverPos).include(dest).build()
+                map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 140))
+            } else {
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(dest, 14f))
+            }
+        } else if (withCoords.size > 1) {
+            // Varios pedidos — encuadrar todos en pantalla
+            val bounds = com.google.android.gms.maps.model.LatLngBounds.Builder()
+            driverMarker?.position?.let { bounds.include(it) }
+            withCoords.forEach { bounds.include(LatLng(it.destLat, it.destLng)) }
+            try {
+                map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 140))
+            } catch (_: Exception) { }
         }
     }
 
@@ -337,14 +364,20 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) startDriverTracking()
 
-        // Restaurar ruta al volver a la pantalla con viaje activo
-        val req = TripRepository.pendingRequest.value
-        if (req != null && TripRepository.driverStatus.value == DriverStatus.ACTIVE_TRIP) {
+        val status = TripRepository.driverStatus.value
+        val req    = TripRepository.pendingRequest.value
+
+        // Viaje activo — mostrar ruta
+        if (req != null && status == DriverStatus.ACTIVE_TRIP) {
             drawRouteToRequest(req)
+            return
         }
-        // Restaurar markers de pedidos pendientes
-        val pending = TripRepository.pendingOrders.value
-        if (!pending.isNullOrEmpty()) updateOrderMarkersOnMap(pending)
+
+        // Online esperando — redibujar markers de pedidos pendientes que llegaron
+        // antes de que el mapa estuviera listo
+        if (status == DriverStatus.ONLINE && lastKnownPendingOrders.isNotEmpty()) {
+            updateOrderMarkersOnMap(lastKnownPendingOrders)
+        }
     }
 
     private fun applyMapStyle(map: GoogleMap) {
