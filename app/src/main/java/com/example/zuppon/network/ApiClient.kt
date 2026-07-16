@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    var BASE_URL = "http://192.168.50.178:5000/"
+    var BASE_URL = "http://institutocaacupepy.es/"
     private const val TAG = "ApiClient"
 
     private val httpClient: OkHttpClient by lazy {

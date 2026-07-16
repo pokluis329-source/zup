@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Permite HTTP para el servidor Flask local en la red WiFi -->
+    <!-- Permite HTTP para el servidor local y el backend de producción -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">192.168.50.178</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>
         <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">institutocaacupepy.es</domain>
     </domain-config>
 </network-security-config>
