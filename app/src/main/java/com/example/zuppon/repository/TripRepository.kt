@@ -122,6 +122,7 @@ object TripRepository {
     // ── Driver actions ────────────────────────────────────────────────────────
 
     fun driverGoOnline()  {
+        android.util.Log.d("ZUPPON_REPO", "🟢 driverGoOnline() - iniciando polling")
         _driverStatus.value = DriverStatus.ONLINE
         startPolling()
     }
@@ -304,18 +305,31 @@ object TripRepository {
     }
 
     private fun fetchPendingOrders() {
-        if (_driverStatus.value != DriverStatus.ONLINE) return
+        android.util.Log.d("ZUPPON_REPO", "🔄 fetchPendingOrders() - iniciando fetch")
+        if (_driverStatus.value != DriverStatus.ONLINE) {
+            android.util.Log.d("ZUPPON_REPO", "⚠️ Driver no está ONLINE, abortando fetch")
+            return
+        }
 
         val now = System.currentTimeMillis()
         tempRejectedIds.entries.removeAll { it.value < now }
 
         com.example.zuppon.network.NetworkRepository.fetchAllOrders(
             onSuccess = { orders ->
-                if (_driverStatus.value != DriverStatus.ONLINE) return@fetchAllOrders
+                android.util.Log.d("ZUPPON_REPO", "✅ fetchAllOrders recibió ${orders.size} pedidos del servidor")
+                if (_driverStatus.value != DriverStatus.ONLINE) {
+                    android.util.Log.d("ZUPPON_REPO", "⚠️ Driver cambió de estado, ignorando respuesta")
+                    return@fetchAllOrders
+                }
 
                 // Filtrar PENDING y no rechazados temporalmente
                 val pendingDtos = orders.filter {
                     it.status == "PENDING" && (tempRejectedIds[it.id] ?: 0L) < now
+                }
+                android.util.Log.d("ZUPPON_REPO", "📋 Pedidos PENDING filtrados: ${pendingDtos.size}")
+
+                pendingDtos.forEachIndexed { i, dto ->
+                    android.util.Log.d("ZUPPON_REPO", "  [$i] id=${dto.id}, items='${dto.items}', dest='${dto.destination}', lat=${dto.dest_lat}, lng=${dto.dest_lng}")
                 }
 
                 // Actualizar el mapa — agrega nuevos, elimina los que ya no son PENDING
@@ -343,9 +357,13 @@ object TripRepository {
                     }
                 }
 
+                android.util.Log.d("ZUPPON_REPO", "📦 pendingOrderMap.size = ${pendingOrderMap.size}")
                 _pendingOrders.value = pendingOrderMap.values.toList()
+                android.util.Log.d("ZUPPON_REPO", "📤 _pendingOrders.value actualizado con ${_pendingOrders.value?.size} pedidos")
             },
-            onError = { /* ignorar errores de red silenciosamente */ }
+            onError = { 
+                android.util.Log.e("ZUPPON_REPO", "❌ Error fetching orders: $it")
+            }
         )
     }
 }

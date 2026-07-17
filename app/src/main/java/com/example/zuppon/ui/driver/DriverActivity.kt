@@ -127,7 +127,11 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
         // ── Pedidos PENDING → pins en el mapa ─────────────────────────────────
         viewModel.pendingOrders.observe(this) { orders ->
-            if (viewModel.driverStatus.value != DriverStatus.ONLINE) return@observe
+            android.util.Log.d("ZUPPON_DRIVER", "🔔 Observer pendingOrders disparado - DriverStatus=${viewModel.driverStatus.value}, pedidos=${orders.size}")
+            if (viewModel.driverStatus.value != DriverStatus.ONLINE) {
+                android.util.Log.d("ZUPPON_DRIVER", "⚠️ Driver no está ONLINE, ignorando pedidos")
+                return@observe
+            }
             updateOrderPinsOnMap(orders)
 
             // Panel inferior: solo mostrar badge con cantidad — no lista
@@ -166,31 +170,56 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
     // ── Pins de pedidos en el mapa ────────────────────────────────────────────
 
     private fun updateOrderPinsOnMap(orders: List<TripRequest>) {
+        android.util.Log.d("ZUPPON_DRIVER", "════════════════════════════════════════════════")
+        android.util.Log.d("ZUPPON_DRIVER", "📍 updateOrderPinsOnMap() llamado")
+        android.util.Log.d("ZUPPON_DRIVER", "📍 Total pedidos recibidos: ${orders.size}")
+        
         lastKnownPendingOrders = orders
-        val map = driverMap ?: return
+        val map = driverMap ?: run {
+            android.util.Log.e("ZUPPON_DRIVER", "❌ Mapa no está listo")
+            return
+        }
 
         markerToOrder.keys.forEach { it.remove() }
         markerToOrder.clear()
 
         if (orders.isEmpty()) {
+            android.util.Log.d("ZUPPON_DRIVER", "⚠️ Lista de pedidos vacía")
             pendingCameraFitDone = false
             return
         }
 
         // Solo pinear pedidos con coords exactas — sin geocoding de texto
         val withCoords = orders.filter { it.hasCoords }
+        android.util.Log.d("ZUPPON_DRIVER", "📍 Pedidos con coords válidas: ${withCoords.size}")
+        
+        orders.forEachIndexed { i, req ->
+            android.util.Log.d("ZUPPON_DRIVER", "  [$i] ${req.passengerName} → hasCoords=${req.hasCoords}, lat=${req.destLat}, lng=${req.destLng}, dest='${req.destination}'")
+        }
+        
         withCoords.forEach { req ->
             val serverId = TripRepository.getServerIdForRequest(req)
-            if (serverId == -1) return@forEach
+            android.util.Log.d("ZUPPON_DRIVER", "  → Creando pin para serverId=$serverId en (${req.destLat}, ${req.destLng})")
+            if (serverId == -1) {
+                android.util.Log.e("ZUPPON_DRIVER", "  ❌ serverId no encontrado para pedido")
+                return@forEach
+            }
             val marker = map.addMarker(
                 MarkerOptions()
                     .position(LatLng(req.destLat, req.destLng))
                     .title("🔔 Toca para ver el pedido")
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
                     .zIndex(3f)
-            ) ?: return@forEach
+            ) ?: run {
+                android.util.Log.e("ZUPPON_DRIVER", "  ❌ No se pudo crear marker")
+                return@forEach
+            }
+            android.util.Log.d("ZUPPON_DRIVER", "  ✅ Pin creado exitosamente")
             markerToOrder[marker] = Pair(serverId, req)
         }
+        
+        android.util.Log.d("ZUPPON_DRIVER", "📍 Total pins creados: ${markerToOrder.size}")
+        android.util.Log.d("ZUPPON_DRIVER", "════════════════════════════════════════════════")
 
         map.setOnMarkerClickListener { tapped ->
             val (sid, r) = markerToOrder[tapped] ?: return@setOnMarkerClickListener false
