@@ -5,9 +5,23 @@ Maneja pedidos, repartidores y el ciclo completo de delivery.
 
 from flask import Flask, jsonify, request, render_template
 from flask_socketio import SocketIO, emit, join_room
+from sqlalchemy import inspect, text
 from database import db, Order, Driver, MenuItem, MENU_SEED
 from datetime import datetime
 import os
+
+
+def _ensure_order_coord_columns():
+    """Agrega dest_lat/dest_lng a DBs creadas antes de que existieran esas columnas."""
+    inspector = inspect(db.engine)
+    if "orders" not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns("orders")}
+    with db.engine.begin() as conn:
+        if "dest_lat" not in existing:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN dest_lat FLOAT DEFAULT 0.0"))
+        if "dest_lng" not in existing:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN dest_lng FLOAT DEFAULT 0.0"))
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "zuppon-dev-secret")
@@ -22,6 +36,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 # ── Crear tablas al arrancar ──────────────────────────────────────────────────
 with app.app_context():
     db.create_all()
+    _ensure_order_coord_columns()
     # Seed del menú si la tabla está vacía
     if MenuItem.query.count() == 0:
         for row in MENU_SEED:
@@ -62,6 +77,8 @@ def create_order():
     order = Order(
         items=data["items"],
         destination=data["destination"],
+        dest_lat=float(data.get("dest_lat", 0.0) or 0.0),
+        dest_lng=float(data.get("dest_lng", 0.0) or 0.0),
         fare=float(data["fare"]),
         client_name=data.get("client_name", "Cliente"),
         status="PENDING",
@@ -137,6 +154,17 @@ def cancel_order(order_id):
     db.session.commit()
     socketio.emit("order_updated", order.to_dict())
     return jsonify(order.to_dict())
+
+
+@app.route("/api/orders/<int:order_id>", methods=["DELETE"])
+def delete_order(order_id):
+    """Eliminar un pedido de la base de datos."""
+    order = Order.query.get_or_404(order_id)
+    order_data = order.to_dict()
+    db.session.delete(order)
+    db.session.commit()
+    socketio.emit("order_deleted", {"id": order_id, "order": order_data})
+    return jsonify({"ok": True, "deleted_id": order_id})
 
 
 # ═════════════════════════════════════════════════════════════════════════════

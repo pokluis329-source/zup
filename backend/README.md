@@ -31,6 +31,7 @@ Corre en http://localhost:5000
 | POST | /api/orders/:id/delivering | En camino |
 | POST | /api/orders/:id/complete | Entregado |
 | POST | /api/orders/:id/cancel | Cancelar |
+| DELETE | /api/orders/:id | Eliminar pedido |
 
 ### Repartidores
 | Método | Ruta | Descripción |

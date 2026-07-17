@@ -84,6 +84,8 @@ class Order(db.Model):
     client_name  = db.Column(db.String(100), default="Cliente")
     items        = db.Column(db.Text, nullable=False)        # resumen del pedido
     destination  = db.Column(db.Text, nullable=False)        # dirección de entrega
+    dest_lat     = db.Column(db.Float, default=0.0)            # coords de entrega (mapa)
+    dest_lng     = db.Column(db.Float, default=0.0)
     fare         = db.Column(db.Float, nullable=False)       # tarifa en USD
 
     status       = db.Column(db.String(20), default="PENDING")
@@ -104,6 +106,8 @@ class Order(db.Model):
             "client_name":    self.client_name,
             "items":          self.items,
             "destination":    self.destination,
+            "dest_lat":       self.dest_lat or 0.0,
+            "dest_lng":       self.dest_lng or 0.0,
             "fare":           self.fare,
             "fare_gs":        int(self.fare * 7300),
             "status":         self.status,

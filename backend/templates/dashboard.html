@@ -157,6 +157,22 @@
     }
     .refresh-btn:hover { opacity: .85; }
 
+    .delete-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #888;
+      padding: 5px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all .15s;
+    }
+    .delete-btn:hover {
+      background: #2a0a0a;
+      border-color: #EF5350;
+      color: #EF5350;
+    }
+
     /* ── Filter tabs ── */
     .filters {
       display: flex;
@@ -280,7 +296,10 @@
 
         <div class="order-footer">
           <div class="fare">${formatGs(o.fare)}</div>
-          <div class="time">${formatTime(o.created_at)}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="time">${formatTime(o.created_at)}</div>
+            <button class="delete-btn" onclick="deleteOrder(${o.id}, event)" title="Eliminar pedido">🗑 Eliminar</button>
+          </div>
         </div>
       </div>
     `).join('');
@@ -320,6 +339,27 @@
     } catch (e) {
       document.getElementById('orders-container').innerHTML =
         `<div class="empty"><div class="emoji">⚠️</div>Error al cargar: ${e.message}</div>`;
+    }
+  }
+
+  async function deleteOrder(id, event) {
+    event.stopPropagation();
+    const order = allOrders.find(o => o.id === id);
+    const label = order ? `#${id} · ${order.items}` : `#${id}`;
+    if (!confirm(`¿Eliminar el pedido ${label}?\n\nEsta acción no se puede deshacer.`)) return;
+
+    try {
+      const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'HTTP ' + res.status);
+      }
+      allOrders = allOrders.filter(o => o.id !== id);
+      updateStats(allOrders);
+      const filtered = currentFilter === 'ALL' ? allOrders : allOrders.filter(o => o.status === currentFilter);
+      renderOrders(filtered);
+    } catch (e) {
+      alert('No se pudo eliminar: ' + e.message);
     }
   }
 
