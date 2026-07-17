@@ -113,10 +113,18 @@ class PickLocationActivity : AppCompatActivity() {
                 val list = gc.getFromLocation(latlng.latitude, latlng.longitude, 1)
                 val addr = list?.firstOrNull()
                 val text = if (addr != null) buildString {
-                    if (!addr.thoroughfare.isNullOrBlank())    append(addr.thoroughfare)
-                    if (!addr.subThoroughfare.isNullOrBlank()) append(" ${addr.subThoroughfare}")
-                    if (!addr.subLocality.isNullOrBlank())     append(", ${addr.subLocality}")
-                    if (!addr.locality.isNullOrBlank())        append(", ${addr.locality}")
+                    if (!addr.thoroughfare.isNullOrBlank()) {
+                        append(addr.thoroughfare)
+                        if (!addr.subThoroughfare.isNullOrBlank()) append(" ${addr.subThoroughfare}")
+                    }
+                    if (!addr.subLocality.isNullOrBlank()) {
+                        if (isNotEmpty()) append(", ")
+                        append(addr.subLocality)
+                    }
+                    if (!addr.locality.isNullOrBlank()) {
+                        if (isNotEmpty()) append(", ")
+                        append(addr.locality)
+                    }
                 }.ifBlank { "%.5f, %.5f".format(latlng.latitude, latlng.longitude) }
                 else "%.5f, %.5f".format(latlng.latitude, latlng.longitude)
 

@@ -51,12 +51,15 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     private var confirmMap: GoogleMap? = null
     private var trackingMap: GoogleMap? = null
     private var deliveryLatLng: LatLng? = null
-    private var userMarker: Marker? = null          // marker de ENTREGA (fijo si es personalizado)
-    private var gpsMarker: Marker? = null           // marker de posición GPS real (siempre se mueve)
+    private var userMarker: Marker? = null
+    private var gpsMarker: Marker? = null
     private var courierMarker: Marker? = null
-    private var cameraFollowing = true              // la cámara sigue al usuario
+    private var cameraFollowing = true
     private var customLocationSet = false
-    private var courierLatLng: LatLng? = null       // posición del repartidor — persiste al volver
+    // true cuando el usuario está en la pantalla de confirmación —
+    // impide que el GPS sobreescriba la posición exacta que eligió en el mapa
+    private var confirmLocationLocked = false
+    private var courierLatLng: LatLng? = null
 
     // ── GPS en tiempo real ────────────────────────────────────────────────────
     private lateinit var fusedClient: FusedLocationProviderClient
@@ -152,7 +155,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 )
             }
             trackingMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latlng, 15f))
-            placeMarkerOnConfirmMap(latlng)
         }
     }
 
@@ -227,8 +229,8 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { location ->
                     val latlng = LatLng(location.latitude, location.longitude)
-                    // NUNCA sobreescribir deliveryLatLng si el usuario eligió personalizada
-                    if (!customLocationSet) deliveryLatLng = latlng
+                    // No sobreescribir si el usuario ya fijó la posición (mapa de confirmación o selector)
+                    if (!customLocationSet && !confirmLocationLocked) deliveryLatLng = latlng
                     onLocationUpdated(latlng)
                 }
             }
@@ -285,7 +287,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                     trackingMap?.animateCamera(CameraUpdateFactory.newLatLng(latlng))
                 }
             }
-            if (confirmMap != null) placeMarkerOnConfirmMap(latlng)
             if (binding.etDestination.text.isNullOrBlank()) scheduleReverseGeocode(latlng)
         } else {
             // Con ubicación personalizada:
@@ -313,9 +314,14 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 val addresses = geocoder.getFromLocation(latlng.latitude, latlng.longitude, 1)
                 val address = addresses?.firstOrNull()
                 val text = if (address != null) buildString {
-                    if (!address.thoroughfare.isNullOrBlank()) append(address.thoroughfare)
-                    if (!address.subThoroughfare.isNullOrBlank()) append(" ${address.subThoroughfare}")
-                    if (!address.locality.isNullOrBlank()) append(", ${address.locality}")
+                    if (!address.thoroughfare.isNullOrBlank()) {
+                        append(address.thoroughfare)
+                        if (!address.subThoroughfare.isNullOrBlank()) append(" ${address.subThoroughfare}")
+                    }
+                    if (!address.locality.isNullOrBlank()) {
+                        if (isNotEmpty()) append(", ")
+                        append(address.locality)
+                    }
                 }.ifBlank { "%.4f, %.4f".format(latlng.latitude, latlng.longitude) }
                 else "%.4f, %.4f".format(latlng.latitude, latlng.longitude)
 
@@ -356,8 +362,20 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             styleMap(map)
             map.uiSettings.isZoomControlsEnabled = false
             map.uiSettings.isScrollGesturesEnabled = true
-            deliveryLatLng?.let { placeMarkerOnConfirmMap(it) }
-                ?: map.moveCamera(CameraUpdateFactory.newLatLngZoom(ASUNCION, 12f))
+            map.uiSettings.isZoomGesturesEnabled = true
+
+            // Centrar en la posición GPS actual — se hace aquí la primera vez
+            val startPos = deliveryLatLng ?: ASUNCION
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(startPos, 16f))
+
+            // Cuando la cámara para, guardar el centro exacto como posición de entrega
+            // Ignorar (0,0) — es el valor default antes de que el mapa se inicialice
+            map.setOnCameraIdleListener {
+                val center = map.cameraPosition.target
+                if (center.latitude != 0.0 || center.longitude != 0.0) {
+                    deliveryLatLng = center
+                }
+            }
         }
 
         (supportFragmentManager.findFragmentById(R.id.map_tracking) as? SupportMapFragment)
@@ -552,9 +570,35 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             }
             binding.tilDeliveryAddress.error = null
             hideKeyboard()
+
+            // Las coords exactas vienen del centro del confirmMap (onCameraIdle las mantiene actualizadas)
+            // Si el mapa aún no se movió, pedir lastLocation como respaldo
             val lat = deliveryLatLng?.latitude ?: 0.0
             val lng = deliveryLatLng?.longitude ?: 0.0
-            viewModel.requestOrder(address, lat, lng)
+
+            if (lat == 0.0 && lng == 0.0 &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+                binding.btnRequestRide.isEnabled = false
+                binding.btnRequestRide.text = "obteniendo ubicación… 📍"
+                fusedClient.lastLocation.addOnSuccessListener { loc ->
+                    binding.btnRequestRide.isEnabled = true
+                    binding.btnRequestRide.text = "🔥 ¡Pedir ahora!"
+                    val finalLat = loc?.latitude ?: 0.0
+                    val finalLng = loc?.longitude ?: 0.0
+                    if (finalLat != 0.0) {
+                        deliveryLatLng = LatLng(finalLat, finalLng)
+                        confirmMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(finalLat, finalLng), 16f))
+                    }
+                    viewModel.requestOrder(address, finalLat, finalLng)
+                }.addOnFailureListener {
+                    binding.btnRequestRide.isEnabled = true
+                    binding.btnRequestRide.text = "🔥 ¡Pedir ahora!"
+                    viewModel.requestOrder(address, 0.0, 0.0)
+                }
+            } else {
+                viewModel.requestOrder(address, lat, lng)
+            }
         }
         binding.btnBackToMenu.setOnClickListener { showMenuScreen() }
         binding.btnCancelRide.setOnClickListener { viewModel.cancelOrder() }
@@ -628,6 +672,8 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.layoutConfirmScreen.visibility  = View.GONE
         binding.layoutTrackingScreen.visibility = View.GONE
         if ((viewModel.cartCount.value ?: 0) > 0) binding.cardCartButton.visibility = View.VISIBLE
+        // Liberar el lock — el GPS vuelve a actualizar la posición
+        confirmLocationLocked = false
     }
 
     private fun showConfirmScreen() {
@@ -638,7 +684,13 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         val addr = binding.etDestination.text?.toString() ?: ""
         binding.etDeliveryAddress.setText(addr)
         buildCartSummaryView()
-        deliveryLatLng?.let { placeMarkerOnConfirmMap(it) }
+        // Desde este momento el GPS no puede pisar la posición — el mapa manda
+        confirmLocationLocked = true
+        // Si el mapa ya existe, centrarlo en la posición GPS actual
+        val pos = deliveryLatLng
+        if (pos != null) {
+            confirmMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, 16f))
+        }
     }
 
     private fun showTrackingScreen() {

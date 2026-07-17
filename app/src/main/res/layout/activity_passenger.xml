@@ -299,18 +299,58 @@
                     android:contentDescription="Elegir ubicación en el mapa" />
             </LinearLayout>
 
-            <!-- Mini mapa para confirmar la ubicación -->
+            <!-- Mini mapa interactivo para ajustar la ubicación exacta -->
             <androidx.cardview.widget.CardView
-                android:layout_width="match_parent" android:layout_height="180dp"
-                android:layout_marginBottom="20dp"
+                android:layout_width="match_parent" android:layout_height="200dp"
+                android:layout_marginBottom="8dp"
                 app:cardBackgroundColor="@color/zuppon_card"
                 app:cardCornerRadius="18dp" app:cardElevation="0dp">
-                <!-- Mapa de confirmación — se inicializa programáticamente -->
                 <FrameLayout
-                    android:id="@+id/map_confirm"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                    android:layout_height="match_parent">
+
+                    <!-- Mapa de confirmación -->
+                    <FrameLayout
+                        android:id="@+id/map_confirm"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+
+                    <!-- Pin fijo en el centro — siempre visible, indica el punto exacto -->
+                    <TextView
+                        android:id="@+id/iv_center_pin"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="📍"
+                        android:textSize="32sp"
+                        android:translationY="-16dp"
+                        android:elevation="8dp" />
+
+                    <!-- Instrucción de arrastre -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:layout_marginBottom="8dp"
+                        android:background="#99000000"
+                        android:paddingStart="10dp" android:paddingEnd="10dp"
+                        android:paddingTop="4dp" android:paddingBottom="4dp"
+                        android:text="Arrastrá para ajustar el punto exacto"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        android:elevation="8dp" />
+                </FrameLayout>
             </androidx.cardview.widget.CardView>
+
+            <!-- Dirección detectada (solo lectura) -->
+            <TextView
+                android:id="@+id/tv_confirm_address"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:textColor="@color/zuppon_text_secondary"
+                android:textSize="13sp"
+                android:gravity="center" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_request_ride"

@@ -10,10 +10,10 @@ import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.zuppon.R
 import com.example.zuppon.RoleSelectionActivity
 import com.example.zuppon.databinding.ActivityDriverBinding
+import com.example.zuppon.databinding.DialogOrderRequestBinding
 import com.example.zuppon.model.OrderRecord
 import com.example.zuppon.model.OrderStatus
 import com.example.zuppon.model.TripRequest
@@ -37,6 +37,7 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
+import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -54,8 +55,11 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
     private val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 3000L)
         .setMinUpdateIntervalMillis(1500L).build()
 
-    // ── Pedidos pendientes ─────────────────────────────────────────────────────
-    private lateinit var pendingAdapter: PendingOrdersAdapter
+    // ── Pedidos en mapa: marker → (serverId, TripRequest) ─────────────────────
+    private val markerToOrder = mutableMapOf<Marker, Pair<Int, TripRequest>>()
+    private var lastKnownPendingOrders: List<TripRequest> = emptyList()
+    private var pendingCameraFitDone = false
+    private var orderSheet: BottomSheetDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,35 +67,9 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         setContentView(binding.root)
 
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
-        setupPendingOrdersList()
         initMap()
         setupListeners()
         observeViewModel()
-    }
-
-    // ── Adapter de pedidos pendientes ─────────────────────────────────────────
-
-    private fun setupPendingOrdersList() {
-        pendingAdapter = PendingOrdersAdapter(
-            onAccept = { serverId, request ->
-                // Al aceptar: limpiar lista, arrancar viaje activo y dibujar ruta
-                viewModel.acceptOrder(serverId)
-                if (request.hasCoords) {
-                    drawRouteToLatLng(
-                        driverMarker?.position ?: return@PendingOrdersAdapter,
-                        LatLng(request.destLat, request.destLng)
-                    )
-                }
-            },
-            onReject = { serverId ->
-                viewModel.rejectOrder(serverId)
-            }
-        )
-        binding.rvPendingOrders.apply {
-            layoutManager = LinearLayoutManager(this@DriverActivity)
-            adapter = pendingAdapter
-            isNestedScrollingEnabled = false
-        }
     }
 
     // ── Listeners ─────────────────────────────────────────────────────────────
@@ -102,8 +80,12 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             startActivity(Intent(this, RoleSelectionActivity::class.java))
             finish()
         }
-        binding.btnGoOnline.setOnClickListener  { viewModel.goOnline() }
-        binding.btnGoOffline.setOnClickListener { viewModel.goOffline() }
+        binding.btnGoOnline.setOnClickListener { viewModel.goOnline() }
+        binding.btnGoOffline.setOnClickListener {
+            pendingCameraFitDone = false
+            orderSheet?.dismiss()
+            viewModel.goOffline()
+        }
         binding.btnTripAction.setOnClickListener {
             lastRouteDraw = 0L
             viewModel.advanceTripStep()
@@ -143,24 +125,22 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
         viewModel.tripState.observe(this) { renderTripState(it) }
 
-        // ── Lista de pedidos PENDING ───────────────────────────────────────────
+        // ── Pedidos PENDING → pins en el mapa ─────────────────────────────────
         viewModel.pendingOrders.observe(this) { orders ->
             if (viewModel.driverStatus.value != DriverStatus.ONLINE) return@observe
+            updateOrderPinsOnMap(orders)
 
-            val items = orders.map { req ->
-                val serverId = TripRepository.getServerIdForRequest(req)
-                PendingOrderItem(serverId = serverId, request = req)
-            }.filter { it.serverId != -1 }
-
-            pendingAdapter.submitList(items)
-
-            val hasPending = items.isNotEmpty()
-            binding.tvOrdersAvailable.visibility = if (hasPending) View.VISIBLE else View.GONE
-            binding.rvPendingOrders.visibility   = if (hasPending) View.VISIBLE else View.GONE
-            binding.layoutWaiting.visibility     = if (hasPending) View.GONE   else View.VISIBLE
-
-            // Siempre actualizar markers — si la lista está vacía limpia los anteriores
-            updateOrderMarkersOnMap(orders)
+            // Panel inferior: solo mostrar badge con cantidad — no lista
+            val count = orders.size
+            if (count > 0) {
+                binding.tvOrdersAvailable.text = "🔔 $count pedido${if (count > 1) "s" else ""} disponible${if (count > 1) "s" else ""} · toca un pin"
+                binding.tvOrdersAvailable.visibility = View.VISIBLE
+            } else {
+                binding.tvOrdersAvailable.visibility = View.GONE
+            }
+            // Ocultar siempre la lista — la interacción es por el mapa
+            binding.rvPendingOrders.visibility = View.GONE
+            binding.layoutWaiting.visibility = if (count > 0) View.GONE else View.VISIBLE
         }
 
         viewModel.tripStep.observe(this) { step ->
@@ -180,63 +160,103 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
-        // Historial de pedidos
-        TripRepository.orderHistory.observe(this) { history ->
-            renderHistory(history)
+        TripRepository.orderHistory.observe(this) { renderHistory(it) }
+    }
+
+    // ── Pins de pedidos en el mapa ────────────────────────────────────────────
+
+    private fun updateOrderPinsOnMap(orders: List<TripRequest>) {
+        lastKnownPendingOrders = orders
+        val map = driverMap ?: return
+
+        markerToOrder.keys.forEach { it.remove() }
+        markerToOrder.clear()
+
+        if (orders.isEmpty()) {
+            pendingCameraFitDone = false
+            return
+        }
+
+        // Solo pinear pedidos con coords exactas — sin geocoding de texto
+        val withCoords = orders.filter { it.hasCoords }
+        withCoords.forEach { req ->
+            val serverId = TripRepository.getServerIdForRequest(req)
+            if (serverId == -1) return@forEach
+            val marker = map.addMarker(
+                MarkerOptions()
+                    .position(LatLng(req.destLat, req.destLng))
+                    .title("🔔 Toca para ver el pedido")
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
+                    .zIndex(3f)
+            ) ?: return@forEach
+            markerToOrder[marker] = Pair(serverId, req)
+        }
+
+        map.setOnMarkerClickListener { tapped ->
+            val (sid, r) = markerToOrder[tapped] ?: return@setOnMarkerClickListener false
+            showOrderSheet(sid, r)
+            true
+        }
+
+        if (!pendingCameraFitDone && withCoords.isNotEmpty()) {
+            pendingCameraFitDone = true
+            fitCameraToOrderPins(map)
         }
     }
 
-    // ── Markers de pedidos disponibles en el mapa ─────────────────────────────
-
-    private val orderMarkers = mutableListOf<Marker>()
-    // Última lista conocida — para redibujar cuando el mapa se inicialice tarde
-    private var lastKnownPendingOrders: List<TripRequest> = emptyList()
-
-    private fun updateOrderMarkersOnMap(orders: List<TripRequest>) {
-        lastKnownPendingOrders = orders
-        val map = driverMap ?: return  // se llamará de nuevo desde onMapReady
-
-        // Quitar markers viejos
-        orderMarkers.forEach { it.remove() }
-        orderMarkers.clear()
-
-        val withCoords = orders.filter { it.hasCoords }
-        if (withCoords.isEmpty()) return
-
-        withCoords.forEach { req ->
-            val dest = LatLng(req.destLat, req.destLng)
-            val marker = map.addMarker(
-                MarkerOptions()
-                    .position(dest)
-                    .title("🔔 ${req.passengerName.take(30)}")
-                    .snippet(req.destination.take(50))
-                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
-                    .zIndex(3f)
-            )
-            if (marker != null) orderMarkers.add(marker)
-        }
-
-        // Si solo hay un pedido con coords, centrar el mapa en él para que sea visible
-        if (withCoords.size == 1) {
-            val single = withCoords.first()
-            val dest = LatLng(single.destLat, single.destLng)
-            val driverPos = driverMarker?.position
-            if (driverPos != null) {
-                val bounds = com.google.android.gms.maps.model.LatLngBounds.Builder()
-                    .include(driverPos).include(dest).build()
-                map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 140))
-            } else {
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(dest, 14f))
-            }
-        } else if (withCoords.size > 1) {
-            // Varios pedidos — encuadrar todos en pantalla
-            val bounds = com.google.android.gms.maps.model.LatLngBounds.Builder()
-            driverMarker?.position?.let { bounds.include(it) }
-            withCoords.forEach { bounds.include(LatLng(it.destLat, it.destLng)) }
+    private fun fitCameraToOrderPins(map: GoogleMap) {
+        val doFit = {
             try {
-                map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 140))
-            } catch (_: Exception) { }
+                val b = com.google.android.gms.maps.model.LatLngBounds.Builder()
+                driverMarker?.position?.let { b.include(it) }
+                markerToOrder.keys.forEach { b.include(it.position) }
+                map.animateCamera(CameraUpdateFactory.newLatLngBounds(b.build(), 160))
+            } catch (_: Exception) {
+                val first = markerToOrder.keys.firstOrNull()?.position
+                if (first != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(first, 14f))
+            }
         }
+        try { map.setOnMapLoadedCallback { doFit() } } catch (_: Exception) { doFit() }
+    }
+
+    // ── BottomSheet al tocar un pin ───────────────────────────────────────────
+
+    private fun showOrderSheet(serverId: Int, req: TripRequest) {
+        orderSheet?.dismiss()
+        val sheet = BottomSheetDialog(this, R.style.Theme_Zuppon)
+        val b = DialogOrderRequestBinding.inflate(layoutInflater)
+        sheet.setContentView(b.root)
+
+        b.tvDlgItems.text       = req.passengerName
+        b.tvDlgDestination.text = req.destination
+        b.tvDlgFare.text        = formatGs(req.fare)
+
+        b.btnDlgAccept.setOnClickListener {
+            sheet.dismiss()
+            viewModel.acceptOrder(serverId)
+            // Limpiar pins de otros pedidos
+            markerToOrder.keys.forEach { it.remove() }
+            markerToOrder.clear()
+            // Dibujar ruta al destino aceptado
+            if (req.hasCoords) {
+                lastRouteDraw = 0L
+                val origin = driverMarker?.position
+                if (origin != null) drawRouteToLatLng(origin, LatLng(req.destLat, req.destLng))
+            }
+        }
+
+        b.btnDlgReject.setOnClickListener {
+            sheet.dismiss()
+            viewModel.rejectOrder(serverId)
+            // Quitar solo el pin de este pedido
+            markerToOrder.entries.find { it.value.first == serverId }?.key?.let {
+                it.remove()
+                markerToOrder.remove(it)
+            }
+        }
+
+        orderSheet = sheet
+        sheet.show()
     }
 
     // ── Historial ─────────────────────────────────────────────────────────────
@@ -248,29 +268,25 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
         binding.layoutEmptyHistory.visibility = View.GONE
-
         history.forEach { record ->
-            val card = layoutInflater.inflate(
-                R.layout.item_order_history, binding.llOrderHistory, false
-            )
+            val card = layoutInflater.inflate(R.layout.item_order_history, binding.llOrderHistory, false)
             card.findViewById<TextView>(R.id.tv_order_destination).text = "📍 ${record.destination}"
-            card.findViewById<TextView>(R.id.tv_order_fare).text = record.formattedFare()
-            card.findViewById<TextView>(R.id.tv_order_time).text = record.formattedTime()
-
+            card.findViewById<TextView>(R.id.tv_order_fare).text        = record.formattedFare()
+            card.findViewById<TextView>(R.id.tv_order_time).text        = record.formattedTime()
             val statusTv = card.findViewById<TextView>(R.id.tv_order_status)
             when (record.status) {
                 OrderStatus.PENDING    -> { statusTv.text = "🔍 Buscando repartidor"; statusTv.setTextColor(getColor(R.color.zuppon_text_secondary)) }
                 OrderStatus.ACCEPTED   -> { statusTv.text = "🛵 Repartidor en camino"; statusTv.setTextColor(getColor(R.color.zuppon_accent)) }
-                OrderStatus.PICKED_UP  -> { statusTv.text = "✅ Pedido recogido"; statusTv.setTextColor(getColor(R.color.zuppon_accent)) }
-                OrderStatus.DELIVERING -> { statusTv.text = "🍔 En camino"; statusTv.setTextColor(getColor(R.color.zuppon_yellow)) }
-                OrderStatus.COMPLETED  -> { statusTv.text = "✅ Entregado"; statusTv.setTextColor(getColor(R.color.zuppon_green)) }
-                OrderStatus.CANCELLED  -> { statusTv.text = "❌ Cancelado"; statusTv.setTextColor(getColor(R.color.zuppon_accent)) }
+                OrderStatus.PICKED_UP  -> { statusTv.text = "✅ Pedido recogido";      statusTv.setTextColor(getColor(R.color.zuppon_accent)) }
+                OrderStatus.DELIVERING -> { statusTv.text = "🍔 En camino";            statusTv.setTextColor(getColor(R.color.zuppon_yellow)) }
+                OrderStatus.COMPLETED  -> { statusTv.text = "✅ Entregado";            statusTv.setTextColor(getColor(R.color.zuppon_green)) }
+                OrderStatus.CANCELLED  -> { statusTv.text = "❌ Cancelado";            statusTv.setTextColor(getColor(R.color.zuppon_accent)) }
             }
             binding.llOrderHistory.addView(card)
         }
     }
 
-    // ── Render del estado del panel inferior ──────────────────────────────────
+    // ── Estado del panel inferior ─────────────────────────────────────────────
 
     private fun renderTripState(state: TripState) {
         binding.layoutOffline.visibility    = View.GONE
@@ -294,7 +310,6 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
             }
             is TripState.SearchingDriver -> {
-                // SearchingDriver ahora solo lo usa el pasajero — el driver usa pendingOrders
                 if (viewModel.driverStatus.value == DriverStatus.ONLINE)
                     binding.layoutOnline.visibility = View.VISIBLE
                 else
@@ -304,22 +319,17 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                 if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP) {
                     binding.layoutActiveTrip.visibility = View.VISIBLE
                     TripRepository.pendingRequest.value?.let { drawRouteToRequest(it) }
-                } else if (viewModel.driverStatus.value == DriverStatus.ONLINE)
+                } else {
                     binding.layoutOnline.visibility = View.VISIBLE
-                else
-                    binding.layoutOffline.visibility = View.VISIBLE
+                }
             }
             is TripState.DriverArrived, is TripState.InProgress -> {
                 if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP)
                     binding.layoutActiveTrip.visibility = View.VISIBLE
-                else if (viewModel.driverStatus.value == DriverStatus.ONLINE)
-                    binding.layoutOnline.visibility = View.VISIBLE
                 else
-                    binding.layoutOffline.visibility = View.VISIBLE
+                    binding.layoutOnline.visibility = View.VISIBLE
             }
-            is TripState.Completed -> {
-                binding.layoutOnline.visibility = View.VISIBLE
-            }
+            is TripState.Completed -> binding.layoutOnline.visibility = View.VISIBLE
         }
     }
 
@@ -329,13 +339,8 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onResume()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) startDriverTracking()
-        syncStateOnResume()
-    }
-
-    private fun syncStateOnResume() {
         val status = TripRepository.driverStatus.value ?: return
         if (status == DriverStatus.ONLINE) TripRepository.ensurePolling()
-
         val req = TripRepository.pendingRequest.value
         if (status == DriverStatus.ACTIVE_TRIP && req != null && driverMap != null) {
             drawRouteToRequest(req)
@@ -356,7 +361,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onMapReady(map: GoogleMap) {
         driverMap = map
-        applyMapStyle(map)
+        try { map.setMapStyle(MapStyleOptions(MAP_STYLE)) } catch (_: Exception) { }
         map.isBuildingsEnabled = true
         map.isTrafficEnabled = true
         map.uiSettings.isZoomControlsEnabled = false
@@ -367,24 +372,17 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         val status = TripRepository.driverStatus.value
         val req    = TripRepository.pendingRequest.value
 
-        // Viaje activo — mostrar ruta
         if (req != null && status == DriverStatus.ACTIVE_TRIP) {
             drawRouteToRequest(req)
             return
         }
-
-        // Online esperando — redibujar markers de pedidos pendientes que llegaron
-        // antes de que el mapa estuviera listo
         if (status == DriverStatus.ONLINE && lastKnownPendingOrders.isNotEmpty()) {
-            updateOrderMarkersOnMap(lastKnownPendingOrders)
+            pendingCameraFitDone = false
+            updateOrderPinsOnMap(lastKnownPendingOrders)
         }
     }
 
-    private fun applyMapStyle(map: GoogleMap) {
-        try { map.setMapStyle(MapStyleOptions(MAP_STYLE)) } catch (_: Exception) { }
-    }
-
-    // ── GPS tracking ──────────────────────────────────────────────────────────
+    // ── GPS ───────────────────────────────────────────────────────────────────
 
     private fun startDriverTracking() {
         if (isTracking || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -392,9 +390,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         isTracking = true
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { loc ->
-                    updateDriverMarker(LatLng(loc.latitude, loc.longitude))
-                }
+                result.lastLocation?.let { updateDriverMarker(LatLng(it.latitude, it.longitude)) }
             }
         }
         fusedClient.requestLocationUpdates(locationRequest, locationCallback!!, Looper.getMainLooper())
@@ -423,20 +419,20 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    // ── Route drawing ─────────────────────────────────────────────────────────
+    // ── Ruta ──────────────────────────────────────────────────────────────────
 
     private var lastRouteDraw = 0L
 
     private fun drawRouteToRequest(req: TripRequest) {
         if (!req.hasCoords) return
-        val destLatLng = LatLng(req.destLat, req.destLng)
+        val dest = LatLng(req.destLat, req.destLng)
         val origin = driverMarker?.position
         if (origin != null) {
-            drawRouteToLatLng(origin, destLatLng)
+            drawRouteToLatLng(origin, dest)
         } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
             fusedClient.lastLocation.addOnSuccessListener { loc ->
-                if (loc != null) drawRouteToLatLng(LatLng(loc.latitude, loc.longitude), destLatLng)
+                if (loc != null) drawRouteToLatLng(LatLng(loc.latitude, loc.longitude), dest)
             }
         }
     }
@@ -447,8 +443,6 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         lastRouteDraw = now
 
         val apiKey = getString(R.string.google_maps_key)
-
-        // Asegurar marker de destino antes de la llamada a la API
         runOnUiThread {
             val map = driverMap ?: return@runOnUiThread
             if (destinationMarker == null) {
@@ -460,7 +454,6 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                 destinationMarker?.position = dest
             }
         }
-
         Thread {
             try {
                 val points = DirectionsHelper.getRoute(apiKey, origin, dest)
@@ -481,6 +474,9 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             } catch (_: Exception) { }
         }.start()
     }
+
+    private fun formatGs(amount: Double) =
+        "Gs %,d".format((amount * 7300).toLong()).replace(',', '.')
 
     companion object {
         private val MAP_STYLE = """
