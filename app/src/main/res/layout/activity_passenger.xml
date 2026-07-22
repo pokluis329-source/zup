@@ -129,6 +129,35 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- Pedidos activos -->
+            <LinearLayout
+                android:id="@+id/section_active_orders"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:background="@color/zuppon_primary_dark"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📦 pedidos activos"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:id="@+id/ll_active_orders"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
             <HorizontalScrollView
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:scrollbars="none" android:background="@color/zuppon_primary"

@@ -22,6 +22,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.zuppon.R
 import com.example.zuppon.RoleSelectionActivity
 import com.example.zuppon.databinding.ActivityPassengerBinding
+import com.example.zuppon.model.ActiveOrder
+import com.example.zuppon.model.ActiveOrderPhase
 import com.example.zuppon.model.FoodMenu
 import com.example.zuppon.model.TripState
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -83,8 +85,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     )
     private var phraseIndex = 0
     private val phraseHandler = android.os.Handler(Looper.getMainLooper())
-    private val paymentHandler = android.os.Handler(Looper.getMainLooper())
-    private var paymentPollRunnable: Runnable? = null
+    private var showTrackingForActiveOrder = false
     private val phraseRunnable = object : Runnable {
         override fun run() {
             if (viewModel.tripState.value == TripState.SearchingDriver) {
@@ -182,12 +183,8 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onResume()
         if (hasLocationPermission()) startLocationTracking()
         if (customLocationSet) restoreCustomMarker()
-        if (viewModel.tripState.value == TripState.AwaitingPayment) {
-            viewModel.checkPayment(
-                onPaid = { stopPaymentPolling() },
-                onPending = { startPaymentPolling() }
-            )
-        }
+        viewModel.syncActiveOrder()
+        viewModel.ensureOrderPolling()
     }
 
     /** Asegura que el marker naranja de la ubicación personalizada esté visible */
@@ -212,7 +209,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopPaymentPolling()
         phraseHandler.removeCallbacks(phraseRunnable)
         geocodeRunnable?.let { geocodeHandler.removeCallbacks(it) }
         stopLocationTracking()
@@ -606,9 +602,13 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 submitOrder(address, lat, lng)
             }
         }
-        binding.btnBackToMenu.setOnClickListener { showMenuScreen() }
+        binding.btnBackToMenu.setOnClickListener {
+            showTrackingForActiveOrder = false
+            showMenuScreen()
+            bindActiveOrders(viewModel.activeOrder.value)
+        }
         binding.btnCancelRide.setOnClickListener {
-            stopPaymentPolling()
+            showTrackingForActiveOrder = false
             viewModel.cancelOrder()
         }
         binding.btnNewTrip.setOnClickListener {
@@ -667,6 +667,13 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
         }
         viewModel.tripState.observe(this) { renderTripState(it) }
+        viewModel.activeOrder.observe(this) { bindActiveOrders(it) }
+        viewModel.userMessage.observe(this) { msg ->
+            if (!msg.isNullOrBlank()) {
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                viewModel.clearUserMessage()
+            }
+        }
     }
 
     // ── Formato Gs ────────────────────────────────────────────────────────────
@@ -730,21 +737,111 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
 
     // ── Estado del pedido ─────────────────────────────────────────────────────
 
+    private fun bindActiveOrders(order: ActiveOrder?) {
+        if (order == null) {
+            binding.sectionActiveOrders.visibility = View.GONE
+            binding.llActiveOrders.removeAllViews()
+            return
+        }
+
+        binding.sectionActiveOrders.visibility = View.VISIBLE
+        binding.llActiveOrders.removeAllViews()
+
+        val card = LayoutInflater.from(this)
+            .inflate(R.layout.item_active_order, binding.llActiveOrders, false)
+
+        card.findViewById<TextView>(R.id.tv_active_order_title).text =
+            "Pedido #${order.serverOrderId}"
+        card.findViewById<TextView>(R.id.tv_active_order_items).text = order.items
+        card.findViewById<TextView>(R.id.tv_active_order_dest).text =
+            "📍 ${order.destination} · ${order.formattedAmount()}"
+        card.findViewById<TextView>(R.id.tv_active_order_status).text = order.statusLabel()
+
+        val showChat = order.phase == ActiveOrderPhase.AWAITING_PAYMENT ||
+            order.phase == ActiveOrderPhase.PENDING_REVIEW
+        val chatBtn = card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_chat)
+        val trackBtn = card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_track)
+        val cancelBtn = card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_cancel)
+
+        chatBtn.visibility = if (showChat) View.VISIBLE else View.GONE
+        chatBtn.setOnClickListener { openPaymentChatFromActive(order) }
+
+        trackBtn.text = when (order.phase) {
+            ActiveOrderPhase.COMPLETED -> "⭐ Calificar"
+            else -> "📍 Seguir"
+        }
+        trackBtn.setOnClickListener {
+            showTrackingForActiveOrder = true
+            renderTripState(viewModel.tripState.value ?: TripState.Idle)
+        }
+
+        val canCancel = order.phase == ActiveOrderPhase.AWAITING_PAYMENT ||
+            order.phase == ActiveOrderPhase.PENDING_REVIEW ||
+            order.phase == ActiveOrderPhase.SEARCHING_DRIVER
+        cancelBtn.visibility = if (canCancel) View.VISIBLE else View.GONE
+        cancelBtn.setOnClickListener {
+            viewModel.cancelOrder()
+            Toast.makeText(this, "Pedido cancelado", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.llActiveOrders.addView(card)
+    }
+
+    private fun openPaymentChatFromActive(order: ActiveOrder) {
+        startActivity(
+            Intent(this, PaymentChatActivity::class.java)
+                .putExtra(PaymentChatActivity.EXTRA_ORDER_ID, order.serverOrderId)
+                .putExtra(PaymentChatActivity.EXTRA_AMOUNT_GS, order.amountGs)
+                .putExtra(PaymentChatActivity.EXTRA_ALIAS, order.alias)
+                .putExtra(PaymentChatActivity.EXTRA_CEDULA, order.cedula)
+        )
+    }
+
     private fun renderTripState(state: TripState) {
+        val hasActive = viewModel.activeOrder.value != null
         when (state) {
             is TripState.Idle, TripState.Cancelled -> {
                 phraseHandler.removeCallbacks(phraseRunnable)
+                showTrackingForActiveOrder = false
                 showMenuScreen()
                 binding.layoutSearching.visibility = View.GONE
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.GONE
                 binding.cardDriverInfo.visibility  = View.GONE
             }
+            is TripState.Completed -> {
+                if (showTrackingForActiveOrder && hasActive) {
+                    showTrackingScreen()
+                    binding.layoutSearching.visibility = View.GONE
+                    binding.layoutCompleted.visibility = View.VISIBLE
+                    binding.cardStatusBadge.visibility = View.GONE
+                    binding.cardDriverInfo.visibility  = View.GONE
+                    bounceIn(binding.layoutCompleted)
+                } else {
+                    phraseHandler.removeCallbacks(phraseRunnable)
+                    showMenuScreen()
+                    bindActiveOrders(viewModel.activeOrder.value)
+                }
+            }
+            else -> {
+                if (showTrackingForActiveOrder && hasActive) {
+                    renderTrackingState(state)
+                } else {
+                    phraseHandler.removeCallbacks(phraseRunnable)
+                    showMenuScreen()
+                    bindActiveOrders(viewModel.activeOrder.value)
+                }
+            }
+        }
+    }
+
+    private fun renderTrackingState(state: TripState) {
+        showTrackingScreen()
+        binding.layoutCompleted.visibility = View.GONE
+        when (state) {
             is TripState.AwaitingPayment -> {
-                showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.VISIBLE
-                binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.VISIBLE
                 binding.tvStatusBadge.text         = "💸 transferí y enviá comprobante"
                 binding.tvSearchingText.text       =
@@ -753,10 +850,8 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 phraseHandler.removeCallbacks(phraseRunnable)
             }
             is TripState.SearchingDriver -> {
-                showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.VISIBLE
-                binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.VISIBLE
                 binding.tvStatusBadge.text         = "⚡ conectando con repartidor"
                 binding.cardDriverInfo.visibility  = View.GONE
@@ -766,7 +861,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             }
             is TripState.DriverOnWay -> {
                 phraseHandler.removeCallbacks(phraseRunnable)
-                showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.GONE
                 binding.tvSearchingText.text       = "¡repartidor recogiendo tu pedido! 🛵"
@@ -778,7 +872,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 deliveryLatLng?.let { addCourierMarker(it) }
             }
             is TripState.DriverArrived -> {
-                showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.GONE
                 binding.tvSearchingText.text       = "pedido recogido · viene hacia ti 🔥"
@@ -788,7 +881,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 populateCourierInfo(state.driver)
             }
             is TripState.InProgress -> {
-                showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.GONE
                 binding.tvSearchingText.text       = "tu comida viene volando 🛵💨"
@@ -797,14 +889,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.cardDriverInfo.visibility  = View.VISIBLE
                 populateCourierInfo(state.driver)
             }
-            is TripState.Completed -> {
-                showTrackingScreen()
-                binding.layoutSearching.visibility = View.GONE
-                binding.layoutCompleted.visibility = View.VISIBLE
-                binding.cardStatusBadge.visibility = View.GONE
-                binding.cardDriverInfo.visibility  = View.GONE
-                bounceIn(binding.layoutCompleted)
-            }
+            else -> { }
         }
     }
 
@@ -842,27 +927,10 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 .putExtra(PaymentChatActivity.EXTRA_ALIAS, payment?.alias ?: "zup.cacupe")
                 .putExtra(PaymentChatActivity.EXTRA_CEDULA, payment?.cedula ?: "6208713")
         )
-        startPaymentPolling()
-    }
-
-    private fun startPaymentPolling() {
-        stopPaymentPolling()
-        paymentPollRunnable = object : Runnable {
-            override fun run() {
-                if (viewModel.tripState.value != TripState.AwaitingPayment) return
-                viewModel.checkPayment(
-                    onPaid = { stopPaymentPolling() },
-                    onPending = { paymentHandler.postDelayed(this, 3000) },
-                    onError = { paymentHandler.postDelayed(this, 5000) }
-                )
-            }
-        }
-        paymentHandler.postDelayed(paymentPollRunnable!!, 2500)
-    }
-
-    private fun stopPaymentPolling() {
-        paymentPollRunnable?.let { paymentHandler.removeCallbacks(it) }
-        paymentPollRunnable = null
+        showTrackingForActiveOrder = false
+        viewModel.clearCartAfterOrder()
+        showMenuScreen()
+        bindActiveOrders(viewModel.activeOrder.value)
     }
 
     private fun populateCourierInfo(courier: com.example.zuppon.model.DriverInfo) {

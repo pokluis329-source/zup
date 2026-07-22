@@ -63,6 +63,19 @@ object NetworkRepository {
         }
     }
 
+    fun fetchOrder(
+        orderId: Int,
+        onSuccess: (OrderDto) -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
+        val api = ApiClient.api ?: run { onError("Sin conexión"); return }
+        bg {
+            val resp = api.getOrder(orderId).execute()
+            if (resp.isSuccessful) main.post { onSuccess(resp.body()!!) }
+            else main.post { onError("HTTP ${resp.code()}") }
+        }
+    }
+
     fun fetchPaymentStatus(
         orderId: Int,
         onSuccess: (PaymentStatusDto) -> Unit,
@@ -178,8 +191,8 @@ object NetworkRepository {
         return raw.take(180).ifBlank { "HTTP $code" }
     }
 
-    fun cancelOrder(onDone: () -> Unit = {}) {
-        val id = serverOrderId
+    fun cancelOrder(orderId: Int? = null, onDone: () -> Unit = {}) {
+        val id = orderId ?: serverOrderId
         if (id == -1) { onDone(); return }
         val api = ApiClient.api ?: run { serverOrderId = -1; onDone(); return }
         bg {

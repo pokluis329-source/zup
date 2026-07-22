@@ -1,6 +1,5 @@
 package com.example.zuppon.ui.passenger
 
-import android.graphics.BitmapFactory
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -37,7 +36,6 @@ class PaymentChatActivity : AppCompatActivity() {
     private var amountGs: Int = 0
     private var alias: String = ""
     private var cedula: String = ""
-    private var pollRunnable: Runnable? = null
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { uploadReceipt(it) }
@@ -89,7 +87,7 @@ class PaymentChatActivity : AppCompatActivity() {
         }
 
         loadMessages()
-        startPaymentPolling()
+        TripRepository.ensurePassengerPolling()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -98,7 +96,6 @@ class PaymentChatActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        stopPaymentPolling()
         super.onDestroy()
     }
 
@@ -130,6 +127,7 @@ class PaymentChatActivity : AppCompatActivity() {
                 compressed.second,
                 onSuccess = {
                     main.post {
+                        TripRepository.onReceiptUploaded()
                         Toast.makeText(this, "Comprobante enviado ✅", Toast.LENGTH_SHORT).show()
                         loadMessages()
                     }
@@ -167,38 +165,6 @@ class PaymentChatActivity : AppCompatActivity() {
         if (scaled !== original) scaled.recycle()
         original.recycle()
         return out.toByteArray() to "image/jpeg"
-    }
-
-    private fun startPaymentPolling() {
-        stopPaymentPolling()
-        pollRunnable = object : Runnable {
-            override fun run() {
-                NetworkRepository.fetchPaymentStatus(orderId,
-                    onSuccess = { status ->
-                        if (status.paid) {
-                            TripRepository.onPaymentApproved()
-                            main.post {
-                                Toast.makeText(
-                                    this@PaymentChatActivity,
-                                    "Pago confirmado 🎉",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                finish()
-                            }
-                        } else {
-                            main.postDelayed(this, 4000)
-                        }
-                    },
-                    onError = { main.postDelayed(this, 5000) }
-                )
-            }
-        }
-        main.postDelayed(pollRunnable!!, 4000)
-    }
-
-    private fun stopPaymentPolling() {
-        pollRunnable?.let { main.removeCallbacks(it) }
-        pollRunnable = null
     }
 
     private fun formatGs(value: Int): String =

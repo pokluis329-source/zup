@@ -5,12 +5,15 @@ import android.os.Handler
 import android.os.Looper
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import com.example.zuppon.model.ActiveOrder
+import com.example.zuppon.model.ActiveOrderPhase
 import com.example.zuppon.model.DriverInfo
 import com.example.zuppon.model.OrderRecord
 import com.example.zuppon.model.OrderStatus
 import com.example.zuppon.model.TripRequest
 import com.example.zuppon.model.TripState
 import com.example.zuppon.network.OrderDto
+import com.example.zuppon.util.ActiveOrderStorage
 import com.example.zuppon.util.OrderStorage
 
 enum class DriverStatus { OFFLINE, ONLINE, ACTIVE_TRIP }
@@ -23,7 +26,12 @@ object TripRepository {
     // ── Polling de pedidos para el repartidor ─────────────────────────────────
     private val pollHandler = Handler(Looper.getMainLooper())
     private var isPolling = false
-    private val POLL_INTERVAL_MS = 3_000L  // 3s — más rápido para el repartidor
+    private val POLL_INTERVAL_MS = 3_000L
+
+    // ── Polling del pedido activo del pasajero ────────────────────────────────
+    private val passengerPollHandler = Handler(Looper.getMainLooper())
+    private var isPassengerPolling = false
+    private val PASSENGER_POLL_MS = 4_000L
 
     // Lista de TODOS los pedidos PENDING visibles para el repartidor
     private val _pendingOrders = MutableLiveData<List<TripRequest>>(emptyList())
@@ -34,13 +42,23 @@ object TripRepository {
 
     fun init(context: Context) {
         appContext = context.applicationContext
-        // Cargar historial en background para no bloquear el main thread
         Thread {
-            val saved = OrderStorage.loadHistory(context)
-            if (saved.isNotEmpty()) {
-                main.post { _orderHistory.value = saved }
+            val savedOrder = ActiveOrderStorage.load(context)
+            val savedHistory = OrderStorage.loadHistory(context)
+            main.post {
+                if (savedHistory.isNotEmpty()) _orderHistory.value = savedHistory
+                if (savedOrder != null) restoreActiveOrder(savedOrder)
             }
         }.start()
+    }
+
+    private fun restoreActiveOrder(order: ActiveOrder) {
+        _activeOrder.value = order
+        com.example.zuppon.network.NetworkRepository.serverOrderId = order.serverOrderId
+        currentOrderId = order.serverOrderId.toLong()
+        applyTripStateFromPhase(order.phase, order.driverName, order.driverVehicle)
+        startPassengerPolling()
+        syncActiveOrderFromServer()
     }
 
     // ── Trip state ────────────────────────────────────────────────────────────
@@ -76,6 +94,14 @@ object TripRepository {
     private val _orderHistory = MutableLiveData<List<OrderRecord>>(emptyList())
     val orderHistory: LiveData<List<OrderRecord>> = _orderHistory
 
+    private val _activeOrder = MutableLiveData<ActiveOrder?>(null)
+    val activeOrder: LiveData<ActiveOrder?> = _activeOrder
+
+    private val _userMessage = MutableLiveData<String?>(null)
+    val userMessage: LiveData<String?> = _userMessage
+
+    fun consumeUserMessage() { _userMessage.value = null }
+
     // ── Passenger actions ─────────────────────────────────────────────────────
 
     fun passengerRequestTrip(
@@ -107,6 +133,18 @@ object TripRepository {
             onSuccess   = { order ->
                 com.example.zuppon.network.NetworkRepository.serverOrderId = order.id
                 currentOrderId = order.id.toLong()
+                val active = ActiveOrder(
+                    serverOrderId = order.id,
+                    items         = request.passengerName,
+                    destination   = request.destination,
+                    fare          = request.fare,
+                    amountGs      = order.amount_gs.takeIf { it > 0 } ?: order.fare_gs,
+                    alias         = order.payment?.alias ?: "zup.cacupe",
+                    cedula        = order.payment?.cedula ?: "6208713",
+                    phase         = ActiveOrderPhase.AWAITING_PAYMENT
+                )
+                saveActiveOrder(active)
+                startPassengerPolling()
                 onOrderCreated(order)
             },
             onError = onError
@@ -114,7 +152,13 @@ object TripRepository {
     }
 
     fun onPaymentApproved() {
+        updateActiveOrderPhase(ActiveOrderPhase.SEARCHING_DRIVER)
         _tripState.value = TripState.SearchingDriver
+        _userMessage.value = "Pago confirmado 🎉 Buscando repartidor…"
+    }
+
+    fun onReceiptUploaded() {
+        updateActiveOrderPhase(ActiveOrderPhase.PENDING_REVIEW)
     }
 
     fun passengerCheckPayment(
@@ -122,7 +166,8 @@ object TripRepository {
         onPending: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        val orderId = com.example.zuppon.network.NetworkRepository.serverOrderId
+        val orderId = _activeOrder.value?.serverOrderId
+            ?: com.example.zuppon.network.NetworkRepository.serverOrderId
         if (orderId == -1) {
             onError("Sin pedido activo")
             return
@@ -131,9 +176,14 @@ object TripRepository {
             orderId,
             onSuccess = { status ->
                 if (status.paid) {
-                    _tripState.value = TripState.SearchingDriver
+                    onPaymentApproved()
                     onPaid()
                 } else {
+                    val phase = when (status.payment_status) {
+                        "PENDING_REVIEW" -> ActiveOrderPhase.PENDING_REVIEW
+                        else -> ActiveOrderPhase.AWAITING_PAYMENT
+                    }
+                    updateActiveOrderPhase(phase)
                     onPending()
                 }
             },
@@ -141,9 +191,25 @@ object TripRepository {
         )
     }
 
+    fun syncActiveOrderFromServer() {
+        val orderId = _activeOrder.value?.serverOrderId ?: return
+        com.example.zuppon.network.NetworkRepository.fetchOrder(
+            orderId,
+            onSuccess = { applyServerOrder(it) },
+            onError = { }
+        )
+    }
+
+    fun ensurePassengerPolling() {
+        if (_activeOrder.value != null && !isPassengerPolling) startPassengerPolling()
+    }
+
     fun passengerCancelTrip() {
-        com.example.zuppon.network.NetworkRepository.cancelOrder()
+        val orderId = _activeOrder.value?.serverOrderId
+            ?: com.example.zuppon.network.NetworkRepository.serverOrderId
+        com.example.zuppon.network.NetworkRepository.cancelOrder(orderId)
         updateCurrentOrderStatus(OrderStatus.CANCELLED)
+        clearActiveOrder()
         _pendingRequest.value = null
         _tripState.value = TripState.Cancelled
         _tripState.value = TripState.Idle
@@ -270,6 +336,183 @@ object TripRepository {
     fun reset() {
         _tripState.value      = TripState.Idle
         _pendingRequest.value = null
+    }
+
+    fun clearActiveOrder() {
+        stopPassengerPolling()
+        appContext?.let { ActiveOrderStorage.clear(it) }
+        _activeOrder.value = null
+        com.example.zuppon.network.NetworkRepository.serverOrderId = -1
+        currentOrderId = -1L
+    }
+
+    // ── Pedido activo del pasajero ────────────────────────────────────────────
+
+    private fun saveActiveOrder(order: ActiveOrder) {
+        _activeOrder.value = order
+        appContext?.let { ActiveOrderStorage.save(it, order) }
+    }
+
+    private fun updateActiveOrderPhase(phase: ActiveOrderPhase) {
+        val current = _activeOrder.value ?: return
+        val prev = current.phase
+        val updated = current.copy(phase = phase)
+        saveActiveOrder(updated)
+        applyTripStateFromPhase(phase, updated.driverName, updated.driverVehicle)
+        if (prev != ActiveOrderPhase.SEARCHING_DRIVER &&
+            phase == ActiveOrderPhase.SEARCHING_DRIVER &&
+            _userMessage.value == null
+        ) {
+            _userMessage.value = "Pago confirmado 🎉 Buscando repartidor…"
+        }
+    }
+
+    private fun applyServerOrder(dto: OrderDto) {
+        if (dto.status == "CANCELLED") {
+            clearActiveOrder()
+            _tripState.value = TripState.Idle
+            return
+        }
+
+        val phase = phaseFromDto(dto) ?: return
+        val current = _activeOrder.value
+        val prevPhase = current?.phase
+
+        val updated = (current ?: ActiveOrder(
+            serverOrderId = dto.id,
+            items         = dto.items.ifBlank { dto.client_name },
+            destination   = dto.destination,
+            fare          = dto.fare,
+            amountGs      = dto.amount_gs.takeIf { it > 0 } ?: dto.fare_gs,
+            alias         = dto.payment?.alias ?: "zup.cacupe",
+            cedula        = dto.payment?.cedula ?: "6208713",
+            phase         = phase
+        )).copy(
+            items         = dto.items.ifBlank { dto.client_name },
+            destination   = dto.destination,
+            fare          = dto.fare,
+            amountGs      = dto.amount_gs.takeIf { it > 0 } ?: dto.fare_gs,
+            phase         = phase,
+            driverName    = dto.driver_name,
+            driverVehicle = dto.driver_vehicle
+        )
+
+        com.example.zuppon.network.NetworkRepository.serverOrderId = dto.id
+        currentOrderId = dto.id.toLong()
+        saveActiveOrder(updated)
+        applyTripStateFromPhase(phase, dto.driver_name, dto.driver_vehicle)
+        syncHistoryFromDto(dto, phase)
+
+        if ((prevPhase == ActiveOrderPhase.AWAITING_PAYMENT ||
+                prevPhase == ActiveOrderPhase.PENDING_REVIEW) &&
+            phase == ActiveOrderPhase.SEARCHING_DRIVER
+        ) {
+            _userMessage.value = "Pago confirmado 🎉 Buscando repartidor…"
+        }
+        if (phase == ActiveOrderPhase.COMPLETED) {
+            _userMessage.value = "¡Pedido entregado! 🎉"
+        }
+    }
+
+    private fun phaseFromDto(dto: OrderDto): ActiveOrderPhase? = when {
+        dto.status == "CANCELLED" -> null
+        dto.status == "COMPLETED" -> ActiveOrderPhase.COMPLETED
+        dto.payment_status == "AWAITING_PAYMENT" -> ActiveOrderPhase.AWAITING_PAYMENT
+        dto.payment_status == "PENDING_REVIEW"   -> ActiveOrderPhase.PENDING_REVIEW
+        dto.status == "DELIVERING" -> ActiveOrderPhase.DELIVERING
+        dto.status == "PICKED_UP"  -> ActiveOrderPhase.PICKED_UP
+        dto.status == "ACCEPTED"   -> ActiveOrderPhase.DRIVER_ASSIGNED
+        dto.payment_status == "PAID" -> ActiveOrderPhase.SEARCHING_DRIVER
+        else -> ActiveOrderPhase.AWAITING_PAYMENT
+    }
+
+    private fun applyTripStateFromPhase(
+        phase: ActiveOrderPhase,
+        driverName: String?,
+        driverVehicle: String?
+    ) {
+        val driver = if (!driverName.isNullOrBlank()) {
+            DriverInfo(
+                name         = driverName,
+                carModel     = driverVehicle ?: "Vehículo",
+                licensePlate = "ZUP",
+                rating       = 5.0,
+                etaMinutes   = 8
+            )
+        } else null
+
+        _tripState.value = when (phase) {
+            ActiveOrderPhase.AWAITING_PAYMENT,
+            ActiveOrderPhase.PENDING_REVIEW   -> TripState.AwaitingPayment
+            ActiveOrderPhase.SEARCHING_DRIVER -> TripState.SearchingDriver
+            ActiveOrderPhase.DRIVER_ASSIGNED  -> TripState.DriverOnWay(
+                driver ?: DriverInfo("Repartidor", "Vehículo", "ZUP", 5.0, 8)
+            )
+            ActiveOrderPhase.PICKED_UP        -> TripState.DriverArrived(
+                driver ?: DriverInfo("Repartidor", "Vehículo", "ZUP", 5.0, 5)
+            )
+            ActiveOrderPhase.DELIVERING       -> TripState.InProgress(
+                driver ?: DriverInfo("Repartidor", "Vehículo", "ZUP", 5.0, 5)
+            )
+            ActiveOrderPhase.COMPLETED        -> TripState.Completed(
+                _activeOrder.value?.fare ?: 0.0
+            )
+        }
+    }
+
+    private fun syncHistoryFromDto(dto: OrderDto, phase: ActiveOrderPhase) {
+        val status = when (phase) {
+            ActiveOrderPhase.COMPLETED        -> OrderStatus.COMPLETED
+            ActiveOrderPhase.DELIVERING       -> OrderStatus.DELIVERING
+            ActiveOrderPhase.PICKED_UP        -> OrderStatus.PICKED_UP
+            ActiveOrderPhase.DRIVER_ASSIGNED  -> OrderStatus.ACCEPTED
+            else -> OrderStatus.PENDING
+        }
+        addOrUpdateHistory(OrderRecord(
+            id          = dto.id.toLong(),
+            items       = dto.items.ifBlank { dto.client_name },
+            destination = dto.destination,
+            fare        = dto.fare,
+            status      = status
+        ))
+    }
+
+    private fun startPassengerPolling() {
+        if (isPassengerPolling || _activeOrder.value == null) return
+        isPassengerPolling = true
+        passengerPollHandler.post(passengerPollRunnable)
+    }
+
+    private fun stopPassengerPolling() {
+        isPassengerPolling = false
+        passengerPollHandler.removeCallbacks(passengerPollRunnable)
+    }
+
+    private val passengerPollRunnable = object : Runnable {
+        override fun run() {
+            if (!isPassengerPolling) return
+            val order = _activeOrder.value
+            if (order == null || order.phase == ActiveOrderPhase.COMPLETED) {
+                stopPassengerPolling()
+                return
+            }
+            com.example.zuppon.network.NetworkRepository.fetchOrder(
+                order.serverOrderId,
+                onSuccess = { dto ->
+                    applyServerOrder(dto)
+                    if (isPassengerPolling && _activeOrder.value?.phase != ActiveOrderPhase.COMPLETED) {
+                        passengerPollHandler.postDelayed(this, PASSENGER_POLL_MS)
+                    } else {
+                        stopPassengerPolling()
+                    }
+                },
+                onError = {
+                    if (isPassengerPolling) {
+                        passengerPollHandler.postDelayed(this, PASSENGER_POLL_MS)
+                    }
+                }
+            )
+        }
     }
 
     // ── History — escritura en background ────────────────────────────────────

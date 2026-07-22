@@ -3,6 +3,7 @@ package com.example.zuppon.ui.passenger
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import com.example.zuppon.model.ActiveOrder
 import com.example.zuppon.model.FoodMenu
 import com.example.zuppon.model.MenuItem
 import com.example.zuppon.model.TripRequest
@@ -15,6 +16,8 @@ import com.example.zuppon.repository.TripRepository
 class PassengerViewModel : ViewModel() {
 
     val tripState: LiveData<TripState> = TripRepository.tripState
+    val activeOrder: LiveData<ActiveOrder?> = TripRepository.activeOrder
+    val userMessage: LiveData<String?> = TripRepository.userMessage
 
     // ── Menú ────────────────────────────────────────────────────────────────
 
@@ -200,6 +203,12 @@ class PassengerViewModel : ViewModel() {
         TripRepository.passengerCheckPayment(onPaid, onPending, onError)
     }
 
+    fun syncActiveOrder() = TripRepository.syncActiveOrderFromServer()
+
+    fun ensureOrderPolling() = TripRepository.ensurePassengerPolling()
+
+    fun clearUserMessage() = TripRepository.consumeUserMessage()
+
     private fun buildCartSummary(): String {
         return _cart.value.orEmpty().entries.joinToString(", ") { (id, qty) ->
             val name = allItems.find { it.id == id }?.name
@@ -207,6 +216,12 @@ class PassengerViewModel : ViewModel() {
                 ?: ""
             "$name x$qty"
         }
+    }
+
+    fun clearCartAfterOrder() {
+        _cart.value = emptyMap()
+        _cartTotal.value = 0.0
+        _cartCount.value = 0
     }
 
     fun cancelOrder() = TripRepository.passengerCancelTrip()
@@ -217,8 +232,8 @@ class PassengerViewModel : ViewModel() {
         _cart.value = emptyMap()
         _cartTotal.value = 0.0
         _cartCount.value = 0
+        TripRepository.clearActiveOrder()
         TripRepository.reset()
-        // Recargar menú por si hubo cambios
         loadMenuFromServer()
     }
 }
