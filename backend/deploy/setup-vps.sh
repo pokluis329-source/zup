@@ -34,10 +34,10 @@ ln -sf /etc/nginx/sites-available/zuppon /etc/nginx/sites-enabled/zuppon
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
-echo "==> Systemd"
-cp "$APP_DIR/backend/deploy/zuppon.service" /etc/systemd/system/zuppon.service
+echo "==> Systemd (servicio zup)"
+cp "$APP_DIR/backend/deploy/zup.service" /etc/systemd/system/zup.service
 systemctl daemon-reload
-systemctl enable zuppon
+systemctl enable zup
 
 echo ""
 echo "Próximos pasos:"

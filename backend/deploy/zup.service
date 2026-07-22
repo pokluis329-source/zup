@@ -1,5 +1,5 @@
 [Unit]
-Description=Zuppon Backend (Flask + Socket.IO)
+Description=Zup Backend (Flask + Socket.IO)
 After=network.target
 
 [Service]
@@ -7,18 +7,18 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/zup/backend
-EnvironmentFile=/var/www/zup/backend/.env
+EnvironmentFile=-/var/www/zup/backend/.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/var/www/zup/backend/venv/bin/gunicorn \
     --worker-class eventlet \
     --workers 1 \
     --bind 127.0.0.1:5003 \
     --timeout 120 \
-    --access-logfile /var/log/zuppon/access.log \
-    --error-logfile /var/log/zuppon/error.log \
     wsgi:app
 Restart=always
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
