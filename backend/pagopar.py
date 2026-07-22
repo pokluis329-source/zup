@@ -63,7 +63,6 @@ def create_transaction(order, buyer: dict) -> dict:
         "id_pedido_comercio": order.id,
         "descripcion_resumen": f"Pedido Zuppon #{order.id}",
         "fecha_maxima_pago": max_date,
-        "forma_pago": int(os.environ.get("PAGOPAR_FORMA_PAGO", "26")),
         "comprador": {
             "nombre": nombre,
             "email": buyer["email"],
@@ -95,6 +94,10 @@ def create_transaction(order, buyer: dict) -> dict:
             }
         ],
     }
+
+    forma_pago = os.environ.get("PAGOPAR_FORMA_PAGO", "").strip()
+    if forma_pago:
+        payload["forma_pago"] = int(forma_pago)
 
     url = f"{PAGOPAR_API_URL}/api/comercios/2.0/iniciar-transaccion"
     resp = requests.post(url, json=payload, timeout=30)

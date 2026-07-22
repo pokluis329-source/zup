@@ -12,7 +12,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.InputMethodManager
-import android.net.Uri
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -611,6 +611,14 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             stopPaymentPolling()
             viewModel.cancelOrder()
         }
+        binding.btnOpenPagopar.setOnClickListener {
+            val url = com.example.zuppon.network.NetworkRepository.lastCheckoutUrl
+            if (url.isNullOrBlank()) {
+                Toast.makeText(this, "No hay link de pago. Intentá confirmar el pedido de nuevo.", Toast.LENGTH_LONG).show()
+            } else {
+                openPagoparCheckout(url)
+            }
+        }
         binding.btnNewTrip.setOnClickListener {
             viewModel.startNewOrder()
             val firstCat = viewModel.categories.value?.firstOrNull() ?: FoodMenu.categories.first()
@@ -739,16 +747,18 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.GONE
                 binding.cardDriverInfo.visibility  = View.GONE
+                binding.btnOpenPagopar.visibility  = View.GONE
             }
             is TripState.AwaitingPayment -> {
                 showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.VISIBLE
+                binding.btnOpenPagopar.visibility  = View.VISIBLE
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.VISIBLE
                 binding.tvStatusBadge.text         = "💳 esperando pago"
                 binding.tvSearchingText.text       =
-                    "completá el pago en Pagopar con tarjeta · volvé acá cuando termines"
+                    "tocá «Abrir pago Pagopar» para pagar con tarjeta u otros medios"
                 binding.cardDriverInfo.visibility  = View.GONE
                 phraseHandler.removeCallbacks(phraseRunnable)
             }
@@ -756,6 +766,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.VISIBLE
+                binding.btnOpenPagopar.visibility  = View.GONE
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.VISIBLE
                 binding.tvStatusBadge.text         = "⚡ conectando con repartidor"
@@ -811,7 +822,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun submitOrder(address: String, lat: Double, lng: Double) {
         val email = binding.etBuyerEmail.text?.toString()?.trim().orEmpty()
         val phone = binding.etBuyerPhone.text?.toString()?.trim().orEmpty()
-        val name  = binding.etBuyerName.text?.toString()?.trim().ifBlank { "Cliente" } ?: "Cliente"
+        val name  = binding.etBuyerName.text?.toString()?.trim().orEmpty().ifBlank { "Cliente" }
 
         if (email.isBlank() || !email.contains("@")) {
             binding.tilBuyerEmail.error = "email inválido"
@@ -845,7 +856,10 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun openPagoparCheckout(url: String) {
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        startActivity(
+            Intent(this, PagoparCheckoutActivity::class.java)
+                .putExtra(PagoparCheckoutActivity.EXTRA_URL, url)
+        )
     }
 
     private fun startPaymentPolling() {

@@ -6,6 +6,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:name=".ZupponApp"
         android:allowBackup="true"
@@ -64,6 +71,13 @@
             android:name=".ui.passenger.PickLocationActivity"
             android:exported="false"
             android:label="Elegir ubicación"
+            android:theme="@style/Theme.Zuppon" />
+
+        <!-- Checkout Pagopar embebido -->
+        <activity
+            android:name=".ui.passenger.PagoparCheckoutActivity"
+            android:exported="false"
+            android:label="Pago Pagopar"
             android:theme="@style/Theme.Zuppon" />
 
         <!-- Panel Repartidor -->

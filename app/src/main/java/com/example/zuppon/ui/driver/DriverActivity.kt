@@ -325,7 +325,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.layoutHistory.visibility    = View.GONE
 
         when (state) {
-            is TripState.Idle, TripState.Cancelled -> {
+            is TripState.Idle, TripState.Cancelled, TripState.AwaitingPayment -> {
                 when (viewModel.driverStatus.value) {
                     DriverStatus.OFFLINE -> {
                         binding.layoutOffline.visibility = View.VISIBLE

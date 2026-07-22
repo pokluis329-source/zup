@@ -109,7 +109,15 @@ object TripRepository {
             onSuccess   = { order ->
                 com.example.zuppon.network.NetworkRepository.serverOrderId = order.id
                 currentOrderId = order.id.toLong()
-                order.checkout_url?.let { onCheckoutReady(it) }
+                val url = order.checkout_url?.takeIf { it.isNotBlank() }
+                    ?: order.pagopar_hash?.takeIf { it.isNotBlank() }
+                        ?.let { "https://www.pagopar.com/pagos/$it" }
+                if (url != null) {
+                    com.example.zuppon.network.NetworkRepository.lastCheckoutUrl = url
+                    onCheckoutReady(url)
+                } else {
+                    onError("Pagopar no devolvió link de pago")
+                }
             },
             onError = onError
         )
