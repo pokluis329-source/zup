@@ -73,11 +73,11 @@
             android:label="Elegir ubicación"
             android:theme="@style/Theme.Zuppon" />
 
-        <!-- Checkout Pagopar embebido -->
+        <!-- Chat de pago / comprobante -->
         <activity
-            android:name=".ui.passenger.PagoparCheckoutActivity"
+            android:name=".ui.passenger.PaymentChatActivity"
             android:exported="false"
-            android:label="Pago Pagopar"
+            android:label="Pago por transferencia"
             android:theme="@style/Theme.Zuppon" />
 
         <!-- Panel Repartidor -->

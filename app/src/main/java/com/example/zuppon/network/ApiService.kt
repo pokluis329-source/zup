@@ -1,10 +1,8 @@
 package com.example.zuppon.network
 
 import retrofit2.Call
-import retrofit2.Response
 import retrofit2.http.*
-
-// ── DTOs ─────────────────────────────────────────────────────────────────────
+import okhttp3.MultipartBody
 
 data class OrderDto(
     val id: Int = 0,
@@ -13,6 +11,7 @@ data class OrderDto(
     val destination: String = "",
     val fare: Double = 0.0,
     val fare_gs: Int = 0,
+    val amount_gs: Int = 0,
     val status: String = "PENDING",
     val driver_id: Int? = null,
     val driver_name: String? = null,
@@ -23,8 +22,15 @@ data class OrderDto(
     val dest_lat: Double = 0.0,
     val dest_lng: Double = 0.0,
     val payment_status: String = "AWAITING_PAYMENT",
-    val pagopar_hash: String? = null,
-    val checkout_url: String? = null
+    val payment: PaymentInfoDto? = null
+)
+
+data class PaymentInfoDto(
+    val alias: String = "",
+    val cedula: String = "",
+    val holder: String = "",
+    val amount_gs: Int? = null,
+    val currency: String = "PYG"
 )
 
 data class CreateOrderRequest(
@@ -36,25 +42,24 @@ data class CreateOrderRequest(
     val dest_lng: Double = 0.0
 )
 
-data class CheckoutOrderRequest(
-    val items: String,
-    val destination: String,
-    val fare: Double,
-    val client_name: String = "Cliente",
-    val dest_lat: Double = 0.0,
-    val dest_lng: Double = 0.0,
-    val buyer_email: String,
-    val buyer_phone: String = "",
-    val buyer_document: String = "0000000"
-)
-
 data class PaymentStatusDto(
     val order_id: Int = 0,
     val payment_status: String = "AWAITING_PAYMENT",
     val paid: Boolean = false,
-    val checkout_url: String? = null,
-    val pagopar_hash: String? = null
+    val payment: PaymentInfoDto? = null
 )
+
+data class PaymentMessageDto(
+    val id: Int = 0,
+    val order_id: Int = 0,
+    val sender: String = "client",
+    val type: String = "text",
+    val body: String = "",
+    val image_url: String? = null,
+    val created_at: String? = null
+)
+
+data class SendMessageRequest(val body: String, val sender: String = "client")
 
 data class AcceptOrderRequest(
     val driver_id: Int,
@@ -102,8 +107,6 @@ data class MenuItemDto(
     val is_active: Boolean = true
 )
 
-// ── Retrofit interface (Call — synchronous compatible) ────────────────────────
-
 interface ApiService {
 
     @GET("api/orders")
@@ -115,11 +118,24 @@ interface ApiService {
     @POST("api/orders")
     fun createOrder(@Body body: CreateOrderRequest): Call<OrderDto>
 
-    @POST("api/orders/checkout")
-    fun checkoutOrder(@Body body: CheckoutOrderRequest): Call<OrderDto>
-
     @GET("api/orders/{id}/payment-status")
     fun getPaymentStatus(@Path("id") id: Int): Call<PaymentStatusDto>
+
+    @GET("api/orders/{id}/messages")
+    fun getPaymentMessages(@Path("id") id: Int): Call<List<PaymentMessageDto>>
+
+    @POST("api/orders/{id}/messages")
+    fun sendPaymentMessage(
+        @Path("id") id: Int,
+        @Body body: SendMessageRequest
+    ): Call<PaymentMessageDto>
+
+    @Multipart
+    @POST("api/orders/{id}/messages/receipt")
+    fun uploadReceipt(
+        @Path("id") id: Int,
+        @Part image: MultipartBody.Part
+    ): Call<PaymentMessageDto>
 
     @POST("api/orders/{id}/accept")
     fun acceptOrder(

@@ -1,8 +1,14 @@
 package com.example.zuppon.network
 
+import android.content.ContentResolver
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.zuppon.model.PaymentMessage
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 object NetworkRepository {
 
@@ -11,23 +17,29 @@ object NetworkRepository {
 
     var serverOrderId: Int = -1
     var serverDriverId: Int = -1
-    var lastCheckoutUrl: String? = null
+    var lastPaymentInfo: PaymentInfoDto? = null
 
-    // Helper: ejecuta en background con try-catch completo
     private fun bg(block: () -> Unit) {
         Thread {
             try { block() }
-            catch (e: Exception) { Log.w(TAG, "Network error (offline): ${e.message}") }
+            catch (e: Exception) { Log.w(TAG, "Network error: ${e.message}") }
         }.start()
     }
 
-    // ── Pedidos ───────────────────────────────────────────────────────────────
+    private fun PaymentMessageDto.toModel() = PaymentMessage(
+        id = id,
+        orderId = order_id,
+        sender = sender,
+        type = type,
+        body = body,
+        imageUrl = image_url,
+        createdAt = created_at
+    )
 
-    fun createCheckout(
+    fun createOrder(
         items: String, destination: String, fare: Double,
         clientName: String = "Cliente",
         destLat: Double = 0.0, destLng: Double = 0.0,
-        buyerEmail: String, buyerPhone: String = "", buyerDocument: String = "0000000",
         onSuccess: (OrderDto) -> Unit = {}, onError: (String) -> Unit = {}
     ) {
         val api = ApiClient.api ?: run {
@@ -35,23 +47,13 @@ object NetworkRepository {
             return
         }
         bg {
-            val resp = api.checkoutOrder(
-                CheckoutOrderRequest(
-                    items = items,
-                    destination = destination,
-                    fare = fare,
-                    client_name = clientName,
-                    dest_lat = destLat,
-                    dest_lng = destLng,
-                    buyer_email = buyerEmail,
-                    buyer_phone = buyerPhone,
-                    buyer_document = buyerDocument
-                )
+            val resp = api.createOrder(
+                CreateOrderRequest(items, destination, fare, clientName, destLat, destLng)
             ).execute()
             if (resp.isSuccessful) {
                 val order = resp.body()!!
                 serverOrderId = order.id
-                lastCheckoutUrl = order.checkout_url
+                lastPaymentInfo = order.payment
                 main.post { onSuccess(order) }
             } else {
                 val msg = resp.errorBody()?.string()?.take(200) ?: "HTTP ${resp.code()}"
@@ -73,26 +75,68 @@ object NetworkRepository {
         }
     }
 
-    fun createOrder(
-        items: String, destination: String, fare: Double,
-        clientName: String = "Cliente",
-        destLat: Double = 0.0, destLng: Double = 0.0,
-        onSuccess: (OrderDto) -> Unit = {}, onError: (String) -> Unit = {}
+    fun fetchPaymentMessages(
+        orderId: Int,
+        onSuccess: (List<PaymentMessage>) -> Unit,
+        onError: (String) -> Unit = {}
     ) {
-        val api = ApiClient.api ?: run {
-            Log.w(TAG, "createOrder skipped — no API client")
-            return
-        }
+        val api = ApiClient.api ?: run { onError("Sin conexión"); return }
         bg {
-            val resp = api.createOrder(
-                CreateOrderRequest(items, destination, fare, clientName, destLat, destLng)
-            ).execute()
+            val resp = api.getPaymentMessages(orderId).execute()
             if (resp.isSuccessful) {
-                val order = resp.body()!!
-                serverOrderId = order.id
-                main.post { onSuccess(order) }
+                val list = resp.body()!!.map { it.toModel() }
+                main.post { onSuccess(list) }
             } else {
                 main.post { onError("HTTP ${resp.code()}") }
+            }
+        }
+    }
+
+    fun sendPaymentMessage(
+        orderId: Int,
+        body: String,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val api = ApiClient.api ?: run { onError("Sin conexión"); return }
+        bg {
+            val resp = api.sendPaymentMessage(orderId, SendMessageRequest(body)).execute()
+            if (resp.isSuccessful) main.post { onSuccess() }
+            else main.post { onError("HTTP ${resp.code()}") }
+        }
+    }
+
+    fun uploadReceipt(
+        orderId: Int,
+        contentResolver: ContentResolver,
+        uri: Uri,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val api = ApiClient.api ?: run { onError("Sin conexión"); return }
+        bg {
+            try {
+                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: run {
+                        main.post { onError("No se pudo leer la imagen") }
+                        return@bg
+                    }
+                val mime = contentResolver.getType(uri) ?: "image/jpeg"
+                val ext = when {
+                    mime.contains("png") -> "png"
+                    mime.contains("webp") -> "webp"
+                    else -> "jpg"
+                }
+                val body = bytes.toRequestBody(mime.toMediaTypeOrNull())
+                val part = MultipartBody.Part.createFormData("image", "receipt.$ext", body)
+                val resp = api.uploadReceipt(orderId, part).execute()
+                if (resp.isSuccessful) main.post { onSuccess() }
+                else {
+                    val msg = resp.errorBody()?.string()?.take(200) ?: "HTTP ${resp.code()}"
+                    main.post { onError(msg) }
+                }
+            } catch (e: Exception) {
+                main.post { onError(e.message ?: "Error al subir") }
             }
         }
     }

@@ -41,7 +41,6 @@ systemctl enable zup
 
 echo ""
 echo "Próximos pasos:"
-echo "  1. nano $APP_DIR/backend/.env   (tokens Pagopar + PUBLIC_BASE_URL)"
+echo "  1. nano $APP_DIR/backend/.env   (alias + cédula de transferencia)"
 echo "  2. bash $APP_DIR/backend/deploy/update.sh"
 echo "  3. certbot --nginx -d $DOMAIN   (SIN www — no tiene DNS)"
-echo "  4. Pagopar webhook: https://$DOMAIN/api/payments/pagopar/webhook"

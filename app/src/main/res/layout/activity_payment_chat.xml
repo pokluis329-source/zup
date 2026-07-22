@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/zuppon_primary">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp"
+        android:background="@color/zuppon_surface">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Transferencia bancaria"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_payment_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/zuppon_yellow"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:text="Gs —" />
+
+        <TextView
+            android:id="@+id/tv_payment_alias"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/zuppon_text_secondary"
+            android:textSize="14sp"
+            android:text="Alias: —" />
+
+        <TextView
+            android:id="@+id/tv_payment_cedula"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/zuppon_text_secondary"
+            android:textSize="14sp"
+            android:text="CI: —" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_payment_chat"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:clipToPadding="false" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical"
+        android:background="@color/zuppon_surface">
+
+        <ImageButton
+            android:id="@+id/btn_attach_receipt"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_accent_pill"
+            android:contentDescription="Enviar comprobante"
+            android:src="@android:drawable/ic_menu_camera"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:boxBackgroundColor="@color/zuppon_card"
+            app:boxStrokeColor="@color/zuppon_accent">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_chat_message"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Mensaje opcional…"
+                android:textColor="@color/white"
+                android:inputType="textCapSentences|textMultiLine"
+                android:maxLines="3" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <ImageButton
+            android:id="@+id/btn_send_message"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_accent_pill"
+            android:contentDescription="Enviar"
+            android:src="@android:drawable/ic_menu_send"
+            android:padding="10dp"
+            app:tint="@color/white" />
+    </LinearLayout>
+
+</LinearLayout>

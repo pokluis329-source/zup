@@ -1,6 +1,6 @@
 # Deploy Zuppon en institutocaacupepy.es
 
-Guía para publicar el backend con **Nginx + Gunicorn + SSL (Let's Encrypt)** y conectar Pagopar.
+Guía para publicar el backend con **Nginx + Gunicorn + SSL (Let's Encrypt)** y pagos por transferencia.
 
 ## Requisitos
 
@@ -48,12 +48,9 @@ Contenido mínimo:
 SECRET_KEY=genera-un-secreto-largo-aqui
 DATABASE_URL=sqlite:////var/www/zup/backend/zuppon.db
 
-PAGOPAR_PUBLIC_KEY=tu_token_publico
-PAGOPAR_PRIVATE_KEY=tu_token_privado
-PAGOPAR_API_URL=https://api.pagopar.com
-PAGOPAR_CHECKOUT_URL=https://www.pagopar.com/pagos
-PAGOPAR_CITY_ID=1
-PAGOPAR_CATEGORY_ID=909
+PAYMENT_ALIAS=tu.alias.bancario
+PAYMENT_CEDULA=6208713
+PAYMENT_HOLDER=Zup Delivery
 GS_RATE=7300
 
 PUBLIC_BASE_URL=https://institutocaacupepy.es
@@ -64,6 +61,8 @@ Permisos:
 ```bash
 sudo chown www-data:www-data /var/www/zup/backend/.env
 sudo chmod 600 /var/www/zup/backend/.env
+sudo mkdir -p /var/www/zup/backend/uploads/receipts
+sudo chown -R www-data:www-data /var/www/zup/backend/uploads
 ```
 
 ## 4. Desplegar / actualizar
@@ -86,14 +85,16 @@ Verificar:
 curl https://institutocaacupepy.es/health
 ```
 
-Deberías ver `"pagopar_configured": true` y la URL del webhook.
+Deberías ver `"payment": { "alias": "...", "cedula": "6208713" }`.
 
-## 6. Webhook Pagopar
+## 6. Confirmar pagos
 
-En el panel [Pagopar/upay](https://www.pagopar.com/), configurá:
+Cuando un cliente sube el comprobante en la app, el pedido queda en **PENDING_REVIEW**.
+
+Entrá al dashboard y tocá **Confirmar pago**:
 
 ```
-https://institutocaacupepy.es/api/payments/pagopar/webhook
+https://institutocaacupepy.es/dashboard
 ```
 
 ## 7. App Android
@@ -128,10 +129,9 @@ curl https://institutocaacupepy.es/health
 | Menú admin | https://institutocaacupepy.es/menu |
 | API | https://institutocaacupepy.es/api/... |
 | Health | https://institutocaacupepy.es/health |
-| Webhook Pagopar | https://institutocaacupepy.es/api/payments/pagopar/webhook |
 
 ## Notas
 
 - **SQLite** en producción funciona para pruebas; para mucho tráfico conviene PostgreSQL (`DATABASE_URL=postgresql://...`).
 - Renovar SSL: `certbot renew` (cron automático con certbot).
-- Si Pagopar falla al crear checkout, revisá logs: `journalctl -u zuppon -n 50`.
+- Comprobantes guardados en `/var/www/zup/backend/uploads/receipts/`.

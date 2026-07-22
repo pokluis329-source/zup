@@ -10,6 +10,7 @@ import com.example.zuppon.model.OrderRecord
 import com.example.zuppon.model.OrderStatus
 import com.example.zuppon.model.TripRequest
 import com.example.zuppon.model.TripState
+import com.example.zuppon.network.OrderDto
 import com.example.zuppon.util.OrderStorage
 
 enum class DriverStatus { OFFLINE, ONLINE, ACTIVE_TRIP }
@@ -79,10 +80,9 @@ object TripRepository {
 
     fun passengerRequestTrip(
         request: TripRequest,
-        buyerEmail: String,
         buyerPhone: String = "",
         buyerName: String = "Cliente",
-        onCheckoutReady: (String) -> Unit = {},
+        onOrderCreated: (OrderDto) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         _pendingRequest.value = request
@@ -97,30 +97,24 @@ object TripRepository {
         currentOrderId = record.id
         addOrUpdateHistory(record)
 
-        com.example.zuppon.network.NetworkRepository.createCheckout(
+        com.example.zuppon.network.NetworkRepository.createOrder(
             items       = request.passengerName,
             destination = request.destination,
             fare        = request.fare,
             clientName  = buyerName,
             destLat     = request.destLat,
             destLng     = request.destLng,
-            buyerEmail  = buyerEmail,
-            buyerPhone  = buyerPhone,
             onSuccess   = { order ->
                 com.example.zuppon.network.NetworkRepository.serverOrderId = order.id
                 currentOrderId = order.id.toLong()
-                val url = order.checkout_url?.takeIf { it.isNotBlank() }
-                    ?: order.pagopar_hash?.takeIf { it.isNotBlank() }
-                        ?.let { "https://www.pagopar.com/pagos/$it" }
-                if (url != null) {
-                    com.example.zuppon.network.NetworkRepository.lastCheckoutUrl = url
-                    onCheckoutReady(url)
-                } else {
-                    onError("Pagopar no devolvió link de pago")
-                }
+                onOrderCreated(order)
             },
             onError = onError
         )
+    }
+
+    fun onPaymentApproved() {
+        _tripState.value = TripState.SearchingDriver
     }
 
     fun passengerCheckPayment(

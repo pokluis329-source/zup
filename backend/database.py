@@ -90,8 +90,7 @@ class Order(db.Model):
     amount_gs    = db.Column(db.Integer, default=0)           # monto cobrado en Gs
 
     payment_status = db.Column(db.String(24), default="AWAITING_PAYMENT")
-    # AWAITING_PAYMENT → PAID | FAILED | REFUNDED
-    pagopar_hash   = db.Column(db.String(128), nullable=True)
+    # AWAITING_PAYMENT → PENDING_REVIEW → PAID | CANCELLED
 
     status       = db.Column(db.String(20), default="PENDING")
     # PENDING → ACCEPTED → PICKED_UP → DELIVERING → COMPLETED / CANCELLED
@@ -119,11 +118,6 @@ class Order(db.Model):
             "fare_gs":        self.amount_gs or int(self.fare * 7300),
             "amount_gs":      self.amount_gs or int(self.fare * 7300),
             "payment_status": self.payment_status,
-            "pagopar_hash":   self.pagopar_hash,
-            "checkout_url":   (
-                f"https://www.pagopar.com/pagos/{self.pagopar_hash}"
-                if self.pagopar_hash else None
-            ),
             "status":         self.status,
             "driver_id":      self.driver_id,
             "driver_name":    self.driver_name,
@@ -134,6 +128,34 @@ class Order(db.Model):
             "completed_at":   self.completed_at.isoformat() if self.completed_at else None,
             "paid_at":        self.paid_at.isoformat() if self.paid_at else None,
         }
+
+
+class PaymentMessage(db.Model):
+    __tablename__ = "payment_messages"
+
+    id         = db.Column(db.Integer, primary_key=True)
+    order_id   = db.Column(db.Integer, db.ForeignKey("orders.id"), nullable=False)
+    sender     = db.Column(db.String(20), default="client")   # client | admin | system
+    msg_type   = db.Column(db.String(20), default="text")     # text | image | system
+    body       = db.Column(db.Text, default="")
+    image_path = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    order = db.relationship("Order", backref=db.backref("payment_messages", lazy=True))
+
+    def to_dict(self, base_url: str = ""):
+        data = {
+            "id":         self.id,
+            "order_id":   self.order_id,
+            "sender":     self.sender,
+            "type":       self.msg_type,
+            "body":       self.body,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+        if self.image_path:
+            path = f"/uploads/receipts/{self.image_path}"
+            data["image_url"] = f"{base_url.rstrip('/')}{path}" if base_url else path
+        return data
 
 
 class Driver(db.Model):

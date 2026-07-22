@@ -9,6 +9,7 @@ import com.example.zuppon.model.TripRequest
 import com.example.zuppon.model.TripState
 import com.example.zuppon.network.MenuItemDto
 import com.example.zuppon.network.NetworkRepository
+import com.example.zuppon.network.OrderDto
 import com.example.zuppon.repository.TripRepository
 
 class PassengerViewModel : ViewModel() {
@@ -171,13 +172,12 @@ class PassengerViewModel : ViewModel() {
         deliveryAddress: String,
         destLat: Double = 0.0,
         destLng: Double = 0.0,
-        buyerEmail: String,
         buyerPhone: String = "",
         buyerName: String = "Cliente",
-        onCheckoutReady: (String) -> Unit = {},
+        onOrderCreated: (OrderDto) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        if (deliveryAddress.isBlank() || buyerEmail.isBlank()) return
+        if (deliveryAddress.isBlank()) return
         val fare = _cartTotal.value ?: 0.0
         val cartSummary = buildCartSummary()
         val request = TripRequest(
@@ -189,10 +189,9 @@ class PassengerViewModel : ViewModel() {
         )
         TripRepository.passengerRequestTrip(
             request = request,
-            buyerEmail = buyerEmail,
             buyerPhone = buyerPhone,
             buyerName = buyerName,
-            onCheckoutReady = onCheckoutReady,
+            onOrderCreated = onOrderCreated,
             onError = onError
         )
     }

@@ -589,7 +589,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.btnRequestRide.text = "obteniendo ubicación… 📍"
                 fusedClient.lastLocation.addOnSuccessListener { loc ->
                     binding.btnRequestRide.isEnabled = true
-                    binding.btnRequestRide.text = "💳 Pagar con Pagopar"
+                    binding.btnRequestRide.text = "Confirmar pedido"
                     val finalLat = loc?.latitude ?: 0.0
                     val finalLng = loc?.longitude ?: 0.0
                     if (finalLat != 0.0) {
@@ -599,7 +599,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                     submitOrder(address, finalLat, finalLng)
                 }.addOnFailureListener {
                     binding.btnRequestRide.isEnabled = true
-                    binding.btnRequestRide.text = "💳 Pagar con Pagopar"
+                    binding.btnRequestRide.text = "Confirmar pedido"
                     submitOrder(address, 0.0, 0.0)
                 }
             } else {
@@ -610,14 +610,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.btnCancelRide.setOnClickListener {
             stopPaymentPolling()
             viewModel.cancelOrder()
-        }
-        binding.btnOpenPagopar.setOnClickListener {
-            val url = com.example.zuppon.network.NetworkRepository.lastCheckoutUrl
-            if (url.isNullOrBlank()) {
-                Toast.makeText(this, "No hay link de pago. Intentá confirmar el pedido de nuevo.", Toast.LENGTH_LONG).show()
-            } else {
-                openPagoparCheckout(url)
-            }
         }
         binding.btnNewTrip.setOnClickListener {
             viewModel.startNewOrder()
@@ -747,18 +739,16 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.GONE
                 binding.cardDriverInfo.visibility  = View.GONE
-                binding.btnOpenPagopar.visibility  = View.GONE
             }
             is TripState.AwaitingPayment -> {
                 showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.VISIBLE
-                binding.btnOpenPagopar.visibility  = View.VISIBLE
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.VISIBLE
-                binding.tvStatusBadge.text         = "💳 esperando pago"
+                binding.tvStatusBadge.text         = "💸 transferí y enviá comprobante"
                 binding.tvSearchingText.text       =
-                    "tocá «Abrir pago Pagopar» para pagar con tarjeta u otros medios"
+                    "abrí el chat de pago para ver el alias y subir la foto"
                 binding.cardDriverInfo.visibility  = View.GONE
                 phraseHandler.removeCallbacks(phraseRunnable)
             }
@@ -766,7 +756,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
                 binding.btnCancelRide.visibility   = View.VISIBLE
-                binding.btnOpenPagopar.visibility  = View.GONE
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.VISIBLE
                 binding.tvStatusBadge.text         = "⚡ conectando con repartidor"
@@ -820,46 +809,40 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun submitOrder(address: String, lat: Double, lng: Double) {
-        val email = binding.etBuyerEmail.text?.toString()?.trim().orEmpty()
         val phone = binding.etBuyerPhone.text?.toString()?.trim().orEmpty()
         val name  = binding.etBuyerName.text?.toString()?.trim().orEmpty().ifBlank { "Cliente" }
 
-        if (email.isBlank() || !email.contains("@")) {
-            binding.tilBuyerEmail.error = "email inválido"
-            shakeView(binding.tilBuyerEmail)
-            return
-        }
-        binding.tilBuyerEmail.error = null
-
         binding.btnRequestRide.isEnabled = false
-        binding.btnRequestRide.text = "preparando pago…"
+        binding.btnRequestRide.text = "creando pedido…"
 
         viewModel.requestOrder(
             deliveryAddress = address,
             destLat = lat,
             destLng = lng,
-            buyerEmail = email,
             buyerPhone = phone,
             buyerName = name,
-            onCheckoutReady = { url ->
-                binding.btnRequestRide.isEnabled = true
-                binding.btnRequestRide.text = "💳 Pagar con Pagopar"
-                openPagoparCheckout(url)
-                startPaymentPolling()
-            },
+            onOrderCreated = { order -> openPaymentChat(order) },
             onError = { msg ->
                 binding.btnRequestRide.isEnabled = true
-                binding.btnRequestRide.text = "💳 Pagar con Pagopar"
-                Toast.makeText(this, "No se pudo iniciar el pago: $msg", Toast.LENGTH_LONG).show()
+                binding.btnRequestRide.text = "Confirmar pedido"
+                Toast.makeText(this, "No se pudo crear el pedido: $msg", Toast.LENGTH_LONG).show()
             }
         )
     }
 
-    private fun openPagoparCheckout(url: String) {
+    private fun openPaymentChat(order: com.example.zuppon.network.OrderDto) {
+        binding.btnRequestRide.isEnabled = true
+        binding.btnRequestRide.text = "Confirmar pedido"
+        val payment = order.payment
+        val amountGs = order.amount_gs.takeIf { it > 0 } ?: order.fare_gs
         startActivity(
-            Intent(this, PagoparCheckoutActivity::class.java)
-                .putExtra(PagoparCheckoutActivity.EXTRA_URL, url)
+            Intent(this, PaymentChatActivity::class.java)
+                .putExtra(PaymentChatActivity.EXTRA_ORDER_ID, order.id)
+                .putExtra(PaymentChatActivity.EXTRA_AMOUNT_GS, amountGs)
+                .putExtra(PaymentChatActivity.EXTRA_ALIAS, payment?.alias ?: "zup.cacupe")
+                .putExtra(PaymentChatActivity.EXTRA_CEDULA, payment?.cedula ?: "6208713")
         )
+        startPaymentPolling()
     }
 
     private fun startPaymentPolling() {

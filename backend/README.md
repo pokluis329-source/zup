@@ -31,7 +31,8 @@ sudo bash /var/www/zup/backend/deploy/update.sh      # cada actualización
 sudo certbot --nginx -d institutocaacupepy.es -d www.institutocaacupepy.es
 ```
 
-Webhook Pagopar: `https://institutocaacupepy.es/api/payments/pagopar/webhook`
+Pago por transferencia: configurá `PAYMENT_ALIAS` y `PAYMENT_CEDULA` en `.env`.
+Confirmá pagos desde https://institutocaacupepy.es/dashboard
 
 ## Endpoints
 
@@ -41,9 +42,10 @@ Webhook Pagopar: `https://institutocaacupepy.es/api/payments/pagopar/webhook`
 | GET  | /api/orders | Listar todos |
 | GET  | /api/orders/:id | Ver uno |
 | POST | /api/orders | Crear pedido (cliente) |
-| POST | /api/orders/checkout | Crear pedido + link Pagopar |
 | GET | /api/orders/:id/payment-status | Estado del pago |
-| POST | /api/payments/pagopar/webhook | Webhook Pagopar |
+| GET | /api/orders/:id/messages | Chat de comprobante |
+| POST | /api/orders/:id/messages/receipt | Subir foto comprobante |
+| POST | /api/orders/:id/approve-payment | Confirmar pago (dashboard) |
 | POST | /api/orders/:id/accept | Aceptar (repartidor) |
 | POST | /api/orders/:id/picked_up | Recogido |
 | POST | /api/orders/:id/delivering | En camino |

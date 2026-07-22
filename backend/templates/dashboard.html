@@ -167,11 +167,27 @@
       font-size: 11px;
       transition: all .15s;
     }
-    .delete-btn:hover {
-      background: #2a0a0a;
-      border-color: #EF5350;
-      color: #EF5350;
+    .approve-btn {
+      background: #00B8D4;
+      border: none;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
     }
+    .approve-btn:hover { opacity: .85; }
+    .payment-pill {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      margin-top: 6px;
+      display: inline-block;
+    }
+    .pay-AWAITING_PAYMENT { background: #2a2200; color: #FFD54F; }
+    .pay-PENDING_REVIEW   { background: #1a2a3a; color: #29B6F6; }
+    .pay-PAID             { background: #0a2a1a; color: #66BB6A; }
 
     /* ── Filter tabs ── */
     .filters {
@@ -247,6 +263,13 @@
   let allOrders = [];
   let currentFilter = 'ALL';
 
+  const PAYMENT_LABELS = {
+    AWAITING_PAYMENT: '💸 Esperando transferencia',
+    PENDING_REVIEW:   '📸 Comprobante enviado',
+    PAID:             '✅ Pagado',
+    CANCELLED:        '❌ Cancelado',
+  };
+
   const STATUS_LABELS = {
     PENDING:    '🔍 Pendiente',
     ACCEPTED:   '🛵 Aceptado',
@@ -291,12 +314,14 @@
 
         <div class="order-items">🍔 ${o.items}</div>
         <div class="order-dest">📍 <span>${o.destination}</span></div>
+        <span class="payment-pill pay-${o.payment_status || 'AWAITING_PAYMENT'}">${PAYMENT_LABELS[o.payment_status] || o.payment_status}</span>
 
         ${o.driver_name ? `<div class="driver-badge">🛵 ${o.driver_name} · ${o.driver_vehicle || ''}</div>` : ''}
 
         <div class="order-footer">
           <div class="fare">${formatGs(o.fare)}</div>
-          <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            ${o.payment_status === 'PENDING_REVIEW' ? `<button class="approve-btn" onclick="approvePayment(${o.id}, event)">✅ Confirmar pago</button>` : ''}
             <div class="time">${formatTime(o.created_at)}</div>
             <button class="delete-btn" onclick="deleteOrder(${o.id}, event)" title="Eliminar pedido">🗑 Eliminar</button>
           </div>
@@ -339,6 +364,18 @@
     } catch (e) {
       document.getElementById('orders-container').innerHTML =
         `<div class="empty"><div class="emoji">⚠️</div>Error al cargar: ${e.message}</div>`;
+    }
+  }
+
+  async function approvePayment(id, event) {
+    event.stopPropagation();
+    if (!confirm(`¿Confirmar que llegó la transferencia del pedido #${id}?`)) return;
+    try {
+      const res = await fetch(`/api/orders/${id}/approve-payment`, { method: 'POST' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await loadOrders();
+    } catch (e) {
+      alert('No se pudo confirmar: ' + e.message);
     }
   }
 
