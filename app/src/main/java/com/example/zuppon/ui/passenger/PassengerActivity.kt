@@ -12,7 +12,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.InputMethodManager
-import android.widget.TextView
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -82,6 +83,8 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     )
     private var phraseIndex = 0
     private val phraseHandler = android.os.Handler(Looper.getMainLooper())
+    private val paymentHandler = android.os.Handler(Looper.getMainLooper())
+    private var paymentPollRunnable: Runnable? = null
     private val phraseRunnable = object : Runnable {
         override fun run() {
             if (viewModel.tripState.value == TripState.SearchingDriver) {
@@ -178,9 +181,13 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onResume() {
         super.onResume()
         if (hasLocationPermission()) startLocationTracking()
-        // Al volver de cualquier Activity (ej. PickLocationActivity), el SupportMapFragment
-        // puede invalidar los markers. Si hay ubicación personalizada, recrear el marker.
         if (customLocationSet) restoreCustomMarker()
+        if (viewModel.tripState.value == TripState.AwaitingPayment) {
+            viewModel.checkPayment(
+                onPaid = { stopPaymentPolling() },
+                onPending = { startPaymentPolling() }
+            )
+        }
     }
 
     /** Asegura que el marker naranja de la ubicación personalizada esté visible */
@@ -205,6 +212,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopPaymentPolling()
         phraseHandler.removeCallbacks(phraseRunnable)
         geocodeRunnable?.let { geocodeHandler.removeCallbacks(it) }
         stopLocationTracking()
@@ -448,7 +456,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                                     PolylineOptions()
                                         .addAll(points)
                                         .width(16f)
-                                        .color(0xFFFF5722.toInt())
+                                        .color(0xFF2196F3.toInt())
                                         .geodesic(true)
                                 )
                                 val bounds = com.google.android.gms.maps.model.LatLngBounds.Builder()
@@ -491,7 +499,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                         PolylineOptions()
                             .addAll(points)
                             .width(16f)
-                            .color(0xFFFF5722.toInt())
+                            .color(0xFF2196F3.toInt())
                             .geodesic(true)
                     )
                     // Fit camera to show both markers + route
@@ -571,8 +579,6 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             binding.tilDeliveryAddress.error = null
             hideKeyboard()
 
-            // Las coords exactas vienen del centro del confirmMap (onCameraIdle las mantiene actualizadas)
-            // Si el mapa aún no se movió, pedir lastLocation como respaldo
             val lat = deliveryLatLng?.latitude ?: 0.0
             val lng = deliveryLatLng?.longitude ?: 0.0
 
@@ -583,25 +589,28 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.btnRequestRide.text = "obteniendo ubicación… 📍"
                 fusedClient.lastLocation.addOnSuccessListener { loc ->
                     binding.btnRequestRide.isEnabled = true
-                    binding.btnRequestRide.text = "🔥 ¡Pedir ahora!"
+                    binding.btnRequestRide.text = "💳 Pagar con Pagopar"
                     val finalLat = loc?.latitude ?: 0.0
                     val finalLng = loc?.longitude ?: 0.0
                     if (finalLat != 0.0) {
                         deliveryLatLng = LatLng(finalLat, finalLng)
                         confirmMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(finalLat, finalLng), 16f))
                     }
-                    viewModel.requestOrder(address, finalLat, finalLng)
+                    submitOrder(address, finalLat, finalLng)
                 }.addOnFailureListener {
                     binding.btnRequestRide.isEnabled = true
-                    binding.btnRequestRide.text = "🔥 ¡Pedir ahora!"
-                    viewModel.requestOrder(address, 0.0, 0.0)
+                    binding.btnRequestRide.text = "💳 Pagar con Pagopar"
+                    submitOrder(address, 0.0, 0.0)
                 }
             } else {
-                viewModel.requestOrder(address, lat, lng)
+                submitOrder(address, lat, lng)
             }
         }
         binding.btnBackToMenu.setOnClickListener { showMenuScreen() }
-        binding.btnCancelRide.setOnClickListener { viewModel.cancelOrder() }
+        binding.btnCancelRide.setOnClickListener {
+            stopPaymentPolling()
+            viewModel.cancelOrder()
+        }
         binding.btnNewTrip.setOnClickListener {
             viewModel.startNewOrder()
             val firstCat = viewModel.categories.value?.firstOrNull() ?: FoodMenu.categories.first()
@@ -731,6 +740,18 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 binding.cardStatusBadge.visibility = View.GONE
                 binding.cardDriverInfo.visibility  = View.GONE
             }
+            is TripState.AwaitingPayment -> {
+                showTrackingScreen()
+                binding.layoutSearching.visibility = View.VISIBLE
+                binding.btnCancelRide.visibility   = View.VISIBLE
+                binding.layoutCompleted.visibility = View.GONE
+                binding.cardStatusBadge.visibility = View.VISIBLE
+                binding.tvStatusBadge.text         = "💳 esperando pago"
+                binding.tvSearchingText.text       =
+                    "completá el pago en Pagopar con tarjeta · volvé acá cuando termines"
+                binding.cardDriverInfo.visibility  = View.GONE
+                phraseHandler.removeCallbacks(phraseRunnable)
+            }
             is TripState.SearchingDriver -> {
                 showTrackingScreen()
                 binding.layoutSearching.visibility = View.VISIBLE
@@ -785,6 +806,66 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 bounceIn(binding.layoutCompleted)
             }
         }
+    }
+
+    private fun submitOrder(address: String, lat: Double, lng: Double) {
+        val email = binding.etBuyerEmail.text?.toString()?.trim().orEmpty()
+        val phone = binding.etBuyerPhone.text?.toString()?.trim().orEmpty()
+        val name  = binding.etBuyerName.text?.toString()?.trim().ifBlank { "Cliente" } ?: "Cliente"
+
+        if (email.isBlank() || !email.contains("@")) {
+            binding.tilBuyerEmail.error = "email inválido"
+            shakeView(binding.tilBuyerEmail)
+            return
+        }
+        binding.tilBuyerEmail.error = null
+
+        binding.btnRequestRide.isEnabled = false
+        binding.btnRequestRide.text = "preparando pago…"
+
+        viewModel.requestOrder(
+            deliveryAddress = address,
+            destLat = lat,
+            destLng = lng,
+            buyerEmail = email,
+            buyerPhone = phone,
+            buyerName = name,
+            onCheckoutReady = { url ->
+                binding.btnRequestRide.isEnabled = true
+                binding.btnRequestRide.text = "💳 Pagar con Pagopar"
+                openPagoparCheckout(url)
+                startPaymentPolling()
+            },
+            onError = { msg ->
+                binding.btnRequestRide.isEnabled = true
+                binding.btnRequestRide.text = "💳 Pagar con Pagopar"
+                Toast.makeText(this, "No se pudo iniciar el pago: $msg", Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+
+    private fun openPagoparCheckout(url: String) {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    private fun startPaymentPolling() {
+        stopPaymentPolling()
+        paymentPollRunnable = object : Runnable {
+            override fun run() {
+                if (viewModel.tripState.value != TripState.AwaitingPayment) return
+                viewModel.checkPayment(
+                    onPaid = { stopPaymentPolling() },
+                    onPending = { paymentHandler.postDelayed(this, 3000) },
+                    onError = { paymentHandler.postDelayed(this, 5000) }
+                )
+            }
+        }
+        paymentHandler.postDelayed(paymentPollRunnable!!, 2500)
+    }
+
+    private fun stopPaymentPolling() {
+        paymentPollRunnable?.let { paymentHandler.removeCallbacks(it) }
+        paymentPollRunnable = null
     }
 
     private fun populateCourierInfo(courier: com.example.zuppon.model.DriverInfo) {

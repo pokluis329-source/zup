@@ -7,7 +7,10 @@ sealed class TripState {
     /** Sin pedido activo. */
     object Idle : TripState()
 
-    /** Cliente hizo un pedido; buscando repartidor. */
+    /** Cliente hizo un pedido; esperando pago Pagopar. */
+    object AwaitingPayment : TripState()
+
+    /** Cliente pagó; buscando repartidor. */
     object SearchingDriver : TripState()
 
     /** Un repartidor aceptó el pedido y está yendo al restaurante. */

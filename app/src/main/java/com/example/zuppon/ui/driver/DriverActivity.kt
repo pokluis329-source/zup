@@ -60,6 +60,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
     private var lastKnownPendingOrders: List<TripRequest> = emptyList()
     private var pendingCameraFitDone = false
     private var orderSheet: BottomSheetDialog? = null
+    private var previousDriverStatus: DriverStatus? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,6 +104,11 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         viewModel.driverStatus.observe(this) { status ->
+            if (previousDriverStatus == DriverStatus.ACTIVE_TRIP && status == DriverStatus.ONLINE) {
+                clearActiveTripFromMap()
+            }
+            previousDriverStatus = status
+
             when (status) {
                 DriverStatus.OFFLINE -> {
                     binding.statusDot.setBackgroundResource(R.drawable.circle_gray)
@@ -208,7 +214,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                 MarkerOptions()
                     .position(LatLng(req.destLat, req.destLng))
                     .title("🔔 Toca para ver el pedido")
-                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW))
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
                     .zIndex(3f)
             ) ?: run {
                 android.util.Log.e("ZUPPON_DRIVER", "  ❌ No se pudo crear marker")
@@ -276,12 +282,6 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
         b.btnDlgReject.setOnClickListener {
             sheet.dismiss()
-            viewModel.rejectOrder(serverId)
-            // Quitar solo el pin de este pedido
-            markerToOrder.entries.find { it.value.first == serverId }?.key?.let {
-                it.remove()
-                markerToOrder.remove(it)
-            }
         }
 
         orderSheet = sheet
@@ -358,7 +358,29 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                 else
                     binding.layoutOnline.visibility = View.VISIBLE
             }
-            is TripState.Completed -> binding.layoutOnline.visibility = View.VISIBLE
+            is TripState.Completed -> {
+                binding.layoutOnline.visibility = View.VISIBLE
+                clearActiveTripFromMap()
+            }
+        }
+    }
+
+    /** Quita ruta/destino del viaje terminado y vuelve al mapa libre del repartidor. */
+    private fun clearActiveTripFromMap() {
+        destinationMarker?.remove()
+        destinationMarker = null
+        activePolyline?.remove()
+        activePolyline = null
+        lastRouteDraw = 0L
+
+        driverMarker?.position?.let { pos ->
+            driverMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, 15f))
+        }
+
+        pendingCameraFitDone = false
+        if (viewModel.driverStatus.value == DriverStatus.ONLINE) {
+            TripRepository.ensurePolling()
+            updateOrderPinsOnMap(lastKnownPendingOrders)
         }
     }
 
@@ -492,7 +514,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                         activePolyline?.remove()
                         activePolyline = map.addPolyline(
                             PolylineOptions().addAll(points)
-                                .width(14f).color(0xFFFF5722.toInt()).geodesic(true)
+                                .width(14f).color(0xFF2196F3.toInt()).geodesic(true)
                         )
                         val bounds = com.google.android.gms.maps.model.LatLngBounds.Builder()
                         points.forEach { bounds.include(it) }

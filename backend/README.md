@@ -18,6 +18,21 @@ python app.py
 ```
 Corre en http://localhost:5000
 
+## Producción (institutocaacupepy.es)
+
+Ver guía completa: [deploy/DEPLOY.md](deploy/DEPLOY.md)
+
+Resumen:
+
+```bash
+# En el VPS
+sudo bash /var/www/zuppon/backend/deploy/setup-vps.sh   # primera vez
+sudo bash /var/www/zuppon/backend/deploy/update.sh      # cada actualización
+sudo certbot --nginx -d institutocaacupepy.es -d www.institutocaacupepy.es
+```
+
+Webhook Pagopar: `https://institutocaacupepy.es/api/payments/pagopar/webhook`
+
 ## Endpoints
 
 ### Pedidos
@@ -26,6 +41,9 @@ Corre en http://localhost:5000
 | GET  | /api/orders | Listar todos |
 | GET  | /api/orders/:id | Ver uno |
 | POST | /api/orders | Crear pedido (cliente) |
+| POST | /api/orders/checkout | Crear pedido + link Pagopar |
+| GET | /api/orders/:id/payment-status | Estado del pago |
+| POST | /api/payments/pagopar/webhook | Webhook Pagopar |
 | POST | /api/orders/:id/accept | Aceptar (repartidor) |
 | POST | /api/orders/:id/picked_up | Recogido |
 | POST | /api/orders/:id/delivering | En camino |

@@ -167,8 +167,17 @@ class PassengerViewModel : ViewModel() {
 
     // ── Pedir ────────────────────────────────────────────────────────────────
 
-    fun requestOrder(deliveryAddress: String, destLat: Double = 0.0, destLng: Double = 0.0) {
-        if (deliveryAddress.isBlank()) return
+    fun requestOrder(
+        deliveryAddress: String,
+        destLat: Double = 0.0,
+        destLng: Double = 0.0,
+        buyerEmail: String,
+        buyerPhone: String = "",
+        buyerName: String = "Cliente",
+        onCheckoutReady: (String) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        if (deliveryAddress.isBlank() || buyerEmail.isBlank()) return
         val fare = _cartTotal.value ?: 0.0
         val cartSummary = buildCartSummary()
         val request = TripRequest(
@@ -178,7 +187,18 @@ class PassengerViewModel : ViewModel() {
             destLat       = destLat,
             destLng       = destLng
         )
-        TripRepository.passengerRequestTrip(request)
+        TripRepository.passengerRequestTrip(
+            request = request,
+            buyerEmail = buyerEmail,
+            buyerPhone = buyerPhone,
+            buyerName = buyerName,
+            onCheckoutReady = onCheckoutReady,
+            onError = onError
+        )
+    }
+
+    fun checkPayment(onPaid: () -> Unit = {}, onPending: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        TripRepository.passengerCheckPayment(onPaid, onPending, onError)
     }
 
     private fun buildCartSummary(): String {

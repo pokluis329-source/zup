@@ -153,7 +153,7 @@ class PickLocationActivity : AppCompatActivity() {
                             PolylineOptions()
                                 .addAll(points)
                                 .width(14f)
-                                .color(0xFFFF5722.toInt())   // naranja Zuppon
+                                .color(0xFF2196F3.toInt())   // azul Zuppon
                                 .geodesic(true)
                         )
                         // Marcador de origen (usuario)

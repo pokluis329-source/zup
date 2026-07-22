@@ -6,7 +6,7 @@
   <title>⚡ Zuppon — Editor de Menú</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, sans-serif; background: #0d0d0d; color: #fff; }
+    body { font-family: -apple-system, sans-serif; background: #0A1628; color: #fff; }
 
     /* ── Topbar ── */
     .topbar {
@@ -16,14 +16,14 @@
       position: sticky; top: 0; z-index: 100;
     }
     .topbar h1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
-    .topbar h1 span { color: #FF5722; }
+    .topbar h1 span { color: #2196F3; }
     .nav-link {
       margin-left: auto; background: #1f1f1f; border: 1px solid #333;
       color: #aaa; padding: 7px 16px; border-radius: 20px;
       cursor: pointer; font-size: 13px; text-decoration: none;
       transition: all .15s;
     }
-    .nav-link:hover { background: #FF5722; color: #fff; border-color: #FF5722; }
+    .nav-link:hover { background: #2196F3; color: #fff; border-color: #2196F3; }
 
     /* ── Barra de acciones ── */
     .actions {
@@ -31,7 +31,7 @@
       padding: 20px 28px; flex-wrap: wrap;
     }
     .btn-new {
-      background: #FF5722; color: #fff; border: none;
+      background: #2196F3; color: #fff; border: none;
       padding: 10px 22px; border-radius: 24px; font-size: 14px;
       font-weight: 700; cursor: pointer; transition: opacity .15s;
     }
@@ -46,7 +46,7 @@
       padding: 9px 14px; border-radius: 24px; font-size: 13px; cursor: pointer;
       transition: all .15s;
     }
-    .cat-filter.active, .cat-filter:hover { background: #FF5722; color: #fff; border-color: #FF5722; }
+    .cat-filter.active, .cat-filter:hover { background: #2196F3; color: #fff; border-color: #2196F3; }
     .item-count { margin-left: auto; font-size: 12px; color: #555; }
 
     /* ── Tabla ── */
@@ -70,11 +70,11 @@
     .td-name { font-weight: 600; max-width: 180px; }
     .td-desc { color: #666; font-size: 12px; max-width: 220px;
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .td-price { color: #00E676; font-weight: 700; white-space: nowrap; }
+    .td-price { color: #00D4FF; font-weight: 700; white-space: nowrap; }
     .td-cat { color: #aaa; font-size: 12px; white-space: nowrap; }
 
     .badge-popular {
-      background: #FF5722; color: #fff; font-size: 10px;
+      background: #2196F3; color: #fff; font-size: 10px;
       font-weight: 700; padding: 2px 8px; border-radius: 12px; white-space: nowrap;
     }
     .badge-inactive {
@@ -110,7 +110,7 @@
     }
     @keyframes popIn { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
     .modal h2 { font-size: 18px; margin-bottom: 20px; }
-    .modal h2 span { color: #FF5722; }
+    .modal h2 span { color: #2196F3; }
 
     .form-row { margin-bottom: 16px; }
     .form-row label { display: block; font-size: 11px; color: #666;
@@ -120,7 +120,7 @@
       color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px;
     }
     .form-row input:focus, .form-row textarea:focus, .form-row select:focus {
-      outline: none; border-color: #FF5722;
+      outline: none; border-color: #2196F3;
     }
     .form-row textarea { resize: vertical; min-height: 72px; }
     .form-row select option { background: #1a1a1a; }
@@ -128,7 +128,7 @@
     .form-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     .form-check { display: flex; align-items: center; gap: 10px; }
-    .form-check input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: #FF5722; }
+    .form-check input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: #2196F3; }
     .form-check label { font-size: 14px; color: #aaa; cursor: pointer; text-transform: none; letter-spacing: 0; }
 
     .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
@@ -137,7 +137,7 @@
       padding: 10px 22px; border-radius: 24px; font-size: 14px; cursor: pointer;
     }
     .btn-save {
-      background: #FF5722; border: none; color: #fff;
+      background: #2196F3; border: none; color: #fff;
       padding: 10px 28px; border-radius: 24px; font-size: 14px;
       font-weight: 700; cursor: pointer; transition: opacity .15s;
     }
@@ -180,7 +180,7 @@
 
 <!-- Topbar -->
 <div class="topbar">
-  <span style="font-size:22px">⚡</span>
+  <img src="/static/logo.png" alt="Zuppon" style="height:36px;width:36px;object-fit:contain" />
   <h1>ZUPPON <span>Menú</span></h1>
   <a class="nav-link" href="/dashboard">← Dashboard</a>
 </div>

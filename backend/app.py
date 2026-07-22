@@ -3,6 +3,10 @@ Zuppon Backend — Flask REST API
 Maneja pedidos, repartidores y el ciclo completo de delivery.
 """
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from flask import Flask, jsonify, request, render_template
 from flask_socketio import SocketIO, emit, join_room
 from sqlalchemy import inspect, text
@@ -10,18 +14,56 @@ from database import db, Order, Driver, MenuItem, MENU_SEED
 from datetime import datetime
 import os
 
+import pagopar
+from pagopar import PagoparError
 
-def _ensure_order_coord_columns():
-    """Agrega dest_lat/dest_lng a DBs creadas antes de que existieran esas columnas."""
+
+def _ensure_order_columns():
+    """Migraciones ligeras para columnas nuevas en orders."""
     inspector = inspect(db.engine)
     if "orders" not in inspector.get_table_names():
         return
     existing = {col["name"] for col in inspector.get_columns("orders")}
+    alters = []
+    if "dest_lat" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN dest_lat FLOAT DEFAULT 0.0")
+    if "dest_lng" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN dest_lng FLOAT DEFAULT 0.0")
+    if "amount_gs" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN amount_gs INTEGER DEFAULT 0")
+    if "payment_status" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN payment_status VARCHAR(24) DEFAULT 'PAID'")
+    if "pagopar_hash" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN pagopar_hash VARCHAR(128)")
+    if "paid_at" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN paid_at DATETIME")
+    if not alters:
+        return
     with db.engine.begin() as conn:
-        if "dest_lat" not in existing:
-            conn.execute(text("ALTER TABLE orders ADD COLUMN dest_lat FLOAT DEFAULT 0.0"))
-        if "dest_lng" not in existing:
-            conn.execute(text("ALTER TABLE orders ADD COLUMN dest_lng FLOAT DEFAULT 0.0"))
+        for stmt in alters:
+            conn.execute(text(stmt))
+
+
+def mark_order_paid(order: Order, notify_drivers: bool = True):
+    """Marca un pedido como pagado y lo publica a repartidores."""
+    if order.payment_status == "PAID":
+        return order
+    order.payment_status = "PAID"
+    order.paid_at = datetime.utcnow()
+    db.session.commit()
+    if notify_drivers and order.status == "PENDING":
+        socketio.emit("new_order", order.to_dict(), room="drivers")
+    return order
+
+
+def sync_payment_from_pagopar(order: Order) -> bool:
+    if not order.pagopar_hash or order.payment_status == "PAID":
+        return order.payment_status == "PAID"
+    status = pagopar.get_order_status(order.pagopar_hash)
+    if status.get("pagado"):
+        mark_order_paid(order)
+        return True
+    return False
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "zuppon-dev-secret")
@@ -36,7 +78,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 # ── Crear tablas al arrancar ──────────────────────────────────────────────────
 with app.app_context():
     db.create_all()
-    _ensure_order_coord_columns()
+    _ensure_order_columns()
     # Seed del menú si la tabla está vacía
     if MenuItem.query.count() == 0:
         for row in MENU_SEED:
@@ -81,15 +123,114 @@ def create_order():
         dest_lng=float(data.get("dest_lng", 0.0) or 0.0),
         fare=float(data["fare"]),
         client_name=data.get("client_name", "Cliente"),
+        amount_gs=pagopar.usd_to_gs(float(data["fare"])),
+        payment_status="AWAITING_PAYMENT",
         status="PENDING",
     )
     db.session.add(order)
     db.session.commit()
 
-    # Notificar a todos los repartidores conectados
-    socketio.emit("new_order", order.to_dict(), room="drivers")
-
     return jsonify(order.to_dict()), 201
+
+
+@app.route("/api/orders/checkout", methods=["POST"])
+def checkout_order():
+    """Crea pedido + transacción Pagopar y devuelve URL de pago."""
+    data = request.get_json() or {}
+    required = ["items", "destination", "fare", "buyer_email"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Faltan campos: {required}"}), 400
+
+    buyer = data.get("buyer") or {}
+    buyer_email = data.get("buyer_email") or buyer.get("email")
+    if not buyer_email:
+        return jsonify({"error": "buyer_email es obligatorio"}), 400
+
+    order = Order(
+        items=data["items"],
+        destination=data["destination"],
+        dest_lat=float(data.get("dest_lat", 0.0) or 0.0),
+        dest_lng=float(data.get("dest_lng", 0.0) or 0.0),
+        fare=float(data["fare"]),
+        client_name=data.get("client_name") or buyer.get("nombre") or "Cliente",
+        amount_gs=pagopar.usd_to_gs(float(data["fare"])),
+        payment_status="AWAITING_PAYMENT",
+        status="PENDING",
+    )
+    db.session.add(order)
+    db.session.commit()
+
+    buyer_payload = {
+        "nombre": buyer.get("nombre") or order.client_name,
+        "email": buyer_email,
+        "telefono": buyer.get("telefono") or data.get("buyer_phone", "0991000000"),
+        "documento": buyer.get("documento") or data.get("buyer_document", "0000000"),
+        "direccion": buyer.get("direccion") or order.destination,
+        "direccion_referencia": buyer.get("direccion_referencia", ""),
+        "coordenadas": buyer.get("coordenadas")
+        or f"{order.dest_lat},{order.dest_lng}",
+    }
+
+    try:
+        tx = pagopar.create_transaction(order, buyer_payload)
+    except PagoparError as exc:
+        db.session.delete(order)
+        db.session.commit()
+        return jsonify({"error": str(exc)}), 502
+
+    order.pagopar_hash = tx["hash"]
+    order.amount_gs = tx["amount_gs"]
+    db.session.commit()
+
+    payload = order.to_dict()
+    payload["checkout_url"] = tx["checkout_url"]
+    return jsonify(payload), 201
+
+
+@app.route("/api/orders/<int:order_id>/payment-status", methods=["GET"])
+def payment_status(order_id):
+    """Consulta estado de pago (sincroniza con Pagopar si hace falta)."""
+    order = Order.query.get_or_404(order_id)
+    if order.payment_status != "PAID":
+        sync_payment_from_pagopar(order)
+        db.session.refresh(order)
+    return jsonify({
+        "order_id": order.id,
+        "payment_status": order.payment_status,
+        "paid": order.payment_status == "PAID",
+        "checkout_url": order.to_dict().get("checkout_url"),
+        "pagopar_hash": order.pagopar_hash,
+    })
+
+
+@app.route("/api/payments/pagopar/webhook", methods=["POST"])
+def pagopar_webhook():
+    """Pagopar notifica cuando un pago se confirma."""
+    data = request.get_json(silent=True) or {}
+    resultado = data.get("resultado") or []
+    if not resultado and isinstance(data.get("hash_pedido"), str):
+        resultado = [data]
+
+    processed = []
+    for item in resultado:
+        hash_pedido = item.get("hash_pedido") or item.get("hash")
+        token = item.get("token")
+        if not hash_pedido:
+            continue
+        if token and not pagopar.verify_webhook_token(hash_pedido, token):
+            continue
+        order = Order.query.filter_by(pagopar_hash=hash_pedido).first()
+        if not order:
+            continue
+        if item.get("pagado") is True or item.get("pagado") == 1:
+            mark_order_paid(order)
+            processed.append(order.id)
+        elif token:
+            sync_payment_from_pagopar(order)
+            if order.payment_status == "PAID":
+                processed.append(order.id)
+
+    return jsonify({"ok": True, "processed": processed})
 
 
 @app.route("/api/orders/<int:order_id>/accept", methods=["POST"])
@@ -100,6 +241,8 @@ def accept_order(order_id):
 
     if order.status != "PENDING":
         return jsonify({"error": "El pedido no está disponible"}), 409
+    if order.payment_status != "PAID":
+        return jsonify({"error": "El pedido aún no fue pagado"}), 409
 
     order.status = "ACCEPTED"
     order.driver_id = data.get("driver_id")
@@ -257,7 +400,15 @@ def on_join_order(data):
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "app": "Zuppon Backend"})
+    base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    webhook = f"{base}/api/payments/pagopar/webhook" if base else None
+    return jsonify({
+        "status": "ok",
+        "app": "Zuppon Backend",
+        "pagopar_configured": pagopar.configured(),
+        "public_base_url": base or None,
+        "pagopar_webhook_url": webhook,
+    })
 
 
 @app.route("/")

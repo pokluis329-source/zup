@@ -6,7 +6,7 @@
   <title>⚡ Zuppon Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, sans-serif; background: #0d0d0d; color: #fff; }
+    body { font-family: -apple-system, sans-serif; background: #0A1628; color: #fff; }
 
     /* ── Topbar ── */
     .topbar {
@@ -19,9 +19,9 @@
       position: sticky; top: 0; z-index: 100;
     }
     .topbar h1 { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
-    .topbar span { color: #FF5722; }
+    .topbar span { color: #2196F3; }
     .badge {
-      background: #FF5722;
+      background: #2196F3;
       color: #fff;
       padding: 3px 10px;
       border-radius: 20px;
@@ -31,7 +31,7 @@
     }
     .dot-live {
       width: 8px; height: 8px;
-      background: #00E676;
+      background: #00B8D4;
       border-radius: 50%;
       animation: pulse 1.5s infinite;
       margin-left: 8px;
@@ -94,11 +94,11 @@
       padding: 4px 10px;
       border-radius: 20px;
     }
-    .status-PENDING    { background: #2a2a00; color: #FFD600; }
+    .status-PENDING    { background: #0a1a2a; color: #00D4FF; }
     .status-ACCEPTED   { background: #1a2a3a; color: #29B6F6; }
     .status-PICKED_UP  { background: #1a2a1a; color: #66BB6A; }
     .status-DELIVERING { background: #2a1a00; color: #FFA726; }
-    .status-COMPLETED  { background: #0a2a0a; color: #00E676; }
+    .status-COMPLETED  { background: #0a1a2a; color: #00D4FF; }
     .status-CANCELLED  { background: #2a0a0a; color: #EF5350; }
 
     .order-items {
@@ -124,11 +124,11 @@
       padding-top: 12px;
       border-top: 1px solid #2a2a2a;
     }
-    .fare { font-size: 16px; font-weight: 800; color: #FFC107; }
+    .fare { font-size: 16px; font-weight: 800; color: #00D4FF; }
     .time { font-size: 11px; color: #555; }
     .driver-badge {
       font-size: 11px;
-      color: #00E676;
+      color: #00B8D4;
       background: #0a1a0a;
       padding: 3px 8px;
       border-radius: 10px;
@@ -145,7 +145,7 @@
 
     /* ── Refresh button ── */
     .refresh-btn {
-      background: #FF5722;
+      background: #2196F3;
       color: #fff;
       border: none;
       padding: 8px 18px;
@@ -191,20 +191,20 @@
       transition: all .15s;
     }
     .filter-btn.active, .filter-btn:hover {
-      background: #FF5722;
+      background: #2196F3;
       color: #fff;
-      border-color: #FF5722;
+      border-color: #2196F3;
     }
   </style>
 </head>
 <body>
 
 <div class="topbar">
-  <span style="font-size:22px">⚡</span>
+  <img src="/static/logo.png" alt="Zuppon" style="height:36px;width:36px;object-fit:contain" />
   <h1>ZUPPON <span>Dashboard</span></h1>
   <div class="dot-live" title="Actualizando en tiempo real"></div>
   <div id="last-update" style="font-size:11px;color:#555;margin-left:8px"></div>
-  <a href="/menu" style="margin-left:auto;background:#1f1f1f;border:1px solid #333;color:#aaa;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.background='#FF5722';this.style.color='#fff'" onmouseout="this.style.background='#1f1f1f';this.style.color='#aaa'">🍔 Editor de Menú</a>
+  <a href="/menu" style="margin-left:auto;background:#1f1f1f;border:1px solid #333;color:#aaa;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.background='#2196F3';this.style.color='#fff'" onmouseout="this.style.background='#1f1f1f';this.style.color='#aaa'">🍔 Editor de Menú</a>
   <button class="refresh-btn" onclick="loadOrders()">↻ Actualizar</button>
 </div>
 
@@ -215,15 +215,15 @@
     <div class="lbl">Total pedidos</div>
   </div>
   <div class="stat-card">
-    <div class="val" style="color:#FFD600" id="stat-pending">—</div>
+    <div class="val" style="color:#2196F3" id="stat-pending">—</div>
     <div class="lbl">Pendientes</div>
   </div>
   <div class="stat-card">
-    <div class="val" style="color:#00E676" id="stat-completed">—</div>
+    <div class="val" style="color:#00D4FF" id="stat-completed">—</div>
     <div class="lbl">Completados</div>
   </div>
   <div class="stat-card">
-    <div class="val" style="color:#FFC107" id="stat-revenue">—</div>
+    <div class="val" style="color:#00D4FF" id="stat-revenue">—</div>
     <div class="lbl">Ingresos (Gs)</div>
   </div>
 </div>

@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    const val BASE_URL = "http://institutocaacupepy.es/"
+    const val BASE_URL = "https://institutocaacupepy.es/"
     private const val TAG = "ApiClient"
 
     private val httpClient: OkHttpClient by lazy {

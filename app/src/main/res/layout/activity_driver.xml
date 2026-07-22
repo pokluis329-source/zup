@@ -21,18 +21,31 @@
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent">
-            <TextView android:id="@+id/tv_toolbar_title"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="⚡ ZUPPON" android:textColor="@color/white"
-                android:textSize="18sp" android:textStyle="bold" android:letterSpacing="0.06" />
-            <TextView android:id="@+id/tv_toolbar_subtitle"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Panel Repartidor 🛵" android:textColor="@color/zuppon_accent"
-                android:textSize="11sp" android:layout_marginTop="1dp" />
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/logo"
+                android:scaleType="fitCenter"
+                android:contentDescription="Zuppon"
+                android:layout_marginEnd="8dp" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView android:id="@+id/tv_toolbar_title"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="ZUPPON" android:textColor="@color/white"
+                    android:textSize="16sp" android:textStyle="bold" android:letterSpacing="0.06" />
+                <TextView android:id="@+id/tv_toolbar_subtitle"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Panel Repartidor 🛵" android:textColor="@color/zuppon_accent"
+                    android:textSize="11sp" android:layout_marginTop="1dp" />
+            </LinearLayout>
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton

@@ -21,7 +21,10 @@ data class OrderDto(
     val accepted_at: String? = null,
     val completed_at: String? = null,
     val dest_lat: Double = 0.0,
-    val dest_lng: Double = 0.0
+    val dest_lng: Double = 0.0,
+    val payment_status: String = "AWAITING_PAYMENT",
+    val pagopar_hash: String? = null,
+    val checkout_url: String? = null
 )
 
 data class CreateOrderRequest(
@@ -31,6 +34,26 @@ data class CreateOrderRequest(
     val client_name: String = "Cliente",
     val dest_lat: Double = 0.0,
     val dest_lng: Double = 0.0
+)
+
+data class CheckoutOrderRequest(
+    val items: String,
+    val destination: String,
+    val fare: Double,
+    val client_name: String = "Cliente",
+    val dest_lat: Double = 0.0,
+    val dest_lng: Double = 0.0,
+    val buyer_email: String,
+    val buyer_phone: String = "",
+    val buyer_document: String = "0000000"
+)
+
+data class PaymentStatusDto(
+    val order_id: Int = 0,
+    val payment_status: String = "AWAITING_PAYMENT",
+    val paid: Boolean = false,
+    val checkout_url: String? = null,
+    val pagopar_hash: String? = null
 )
 
 data class AcceptOrderRequest(
@@ -91,6 +114,12 @@ interface ApiService {
 
     @POST("api/orders")
     fun createOrder(@Body body: CreateOrderRequest): Call<OrderDto>
+
+    @POST("api/orders/checkout")
+    fun checkoutOrder(@Body body: CheckoutOrderRequest): Call<OrderDto>
+
+    @GET("api/orders/{id}/payment-status")
+    fun getPaymentStatus(@Path("id") id: Int): Call<PaymentStatusDto>
 
     @POST("api/orders/{id}/accept")
     fun acceptOrder(

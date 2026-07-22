@@ -23,8 +23,6 @@ object TripRepository {
     private val pollHandler = Handler(Looper.getMainLooper())
     private var isPolling = false
     private val POLL_INTERVAL_MS = 3_000L  // 3s — más rápido para el repartidor
-    // IDs rechazados temporalmente: id → timestamp hasta el que se ignoran (60s)
-    private val tempRejectedIds = mutableMapOf<Int, Long>()
 
     // Lista de TODOS los pedidos PENDING visibles para el repartidor
     private val _pendingOrders = MutableLiveData<List<TripRequest>>(emptyList())
@@ -79,10 +77,16 @@ object TripRepository {
 
     // ── Passenger actions ─────────────────────────────────────────────────────
 
-    fun passengerRequestTrip(request: TripRequest) {
-        // Todo en el main thread — solo actualizamos LiveData y disparamos red en bg
+    fun passengerRequestTrip(
+        request: TripRequest,
+        buyerEmail: String,
+        buyerPhone: String = "",
+        buyerName: String = "Cliente",
+        onCheckoutReady: (String) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
         _pendingRequest.value = request
-        _tripState.value = TripState.SearchingDriver
+        _tripState.value = TripState.AwaitingPayment
 
         val record = OrderRecord(
             items       = request.passengerName,
@@ -91,19 +95,47 @@ object TripRepository {
             status      = OrderStatus.PENDING
         )
         currentOrderId = record.id
-        addOrUpdateHistory(record)  // guarda en disco en background
+        addOrUpdateHistory(record)
 
-        // Sincronizar con backend sin bloquear
-        com.example.zuppon.network.NetworkRepository.createOrder(
+        com.example.zuppon.network.NetworkRepository.createCheckout(
             items       = request.passengerName,
             destination = request.destination,
             fare        = request.fare,
+            clientName  = buyerName,
             destLat     = request.destLat,
             destLng     = request.destLng,
+            buyerEmail  = buyerEmail,
+            buyerPhone  = buyerPhone,
             onSuccess   = { order ->
-                // Guardar el ID del servidor para que cancelOrder funcione
                 com.example.zuppon.network.NetworkRepository.serverOrderId = order.id
-            }
+                currentOrderId = order.id.toLong()
+                order.checkout_url?.let { onCheckoutReady(it) }
+            },
+            onError = onError
+        )
+    }
+
+    fun passengerCheckPayment(
+        onPaid: () -> Unit = {},
+        onPending: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val orderId = com.example.zuppon.network.NetworkRepository.serverOrderId
+        if (orderId == -1) {
+            onError("Sin pedido activo")
+            return
+        }
+        com.example.zuppon.network.NetworkRepository.fetchPaymentStatus(
+            orderId,
+            onSuccess = { status ->
+                if (status.paid) {
+                    _tripState.value = TripState.SearchingDriver
+                    onPaid()
+                } else {
+                    onPending()
+                }
+            },
+            onError = onError
         )
     }
 
@@ -142,18 +174,10 @@ object TripRepository {
     }
 
     fun driverRejectOrder(serverId: Int) {
-        tempRejectedIds[serverId] = System.currentTimeMillis() + 60_000L
-        pendingOrderMap.remove(serverId)
-        _pendingOrders.value = pendingOrderMap.values.toList()
+        // Solo cierra el diálogo — el pin sigue en el mapa por si quiere aceptarlo después
     }
 
     fun driverRejectTrip() {
-        val rejectedId = com.example.zuppon.network.NetworkRepository.serverOrderId
-        if (rejectedId != -1) {
-            tempRejectedIds[rejectedId] = System.currentTimeMillis() + 60_000L
-            pendingOrderMap.remove(rejectedId)
-            _pendingOrders.value = pendingOrderMap.values.toList()
-        }
         _tripState.value = TripState.Idle
         _pendingRequest.value = null
         _driverStatus.value = DriverStatus.ONLINE
@@ -234,9 +258,10 @@ object TripRepository {
         _earningsToday.value = (_earningsToday.value ?: 0.0) + fare
         _tripStep.value      = 0
         _driverStatus.value  = DriverStatus.ONLINE
-        _tripState.value     = TripState.Completed(fare)
+        _tripState.value     = TripState.Idle
         _pendingRequest.value = null
         currentOrderId       = -1L
+        com.example.zuppon.network.NetworkRepository.serverOrderId = -1
         startPolling()  // volver a buscar pedidos
     }
 
@@ -311,9 +336,6 @@ object TripRepository {
             return
         }
 
-        val now = System.currentTimeMillis()
-        tempRejectedIds.entries.removeAll { it.value < now }
-
         com.example.zuppon.network.NetworkRepository.fetchAllOrders(
             onSuccess = { orders ->
                 android.util.Log.d("ZUPPON_REPO", "✅ fetchAllOrders recibió ${orders.size} pedidos del servidor")
@@ -322,9 +344,8 @@ object TripRepository {
                     return@fetchAllOrders
                 }
 
-                // Filtrar PENDING y no rechazados temporalmente
                 val pendingDtos = orders.filter {
-                    it.status == "PENDING" && (tempRejectedIds[it.id] ?: 0L) < now
+                    it.status == "PENDING" && it.payment_status == "PAID"
                 }
                 android.util.Log.d("ZUPPON_REPO", "📋 Pedidos PENDING filtrados: ${pendingDtos.size}")
 

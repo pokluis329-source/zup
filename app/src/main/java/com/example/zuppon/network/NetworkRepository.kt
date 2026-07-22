@@ -11,6 +11,7 @@ object NetworkRepository {
 
     var serverOrderId: Int = -1
     var serverDriverId: Int = -1
+    var lastCheckoutUrl: String? = null
 
     // Helper: ejecuta en background con try-catch completo
     private fun bg(block: () -> Unit) {
@@ -21,6 +22,56 @@ object NetworkRepository {
     }
 
     // ── Pedidos ───────────────────────────────────────────────────────────────
+
+    fun createCheckout(
+        items: String, destination: String, fare: Double,
+        clientName: String = "Cliente",
+        destLat: Double = 0.0, destLng: Double = 0.0,
+        buyerEmail: String, buyerPhone: String = "", buyerDocument: String = "0000000",
+        onSuccess: (OrderDto) -> Unit = {}, onError: (String) -> Unit = {}
+    ) {
+        val api = ApiClient.api ?: run {
+            onError("Sin conexión al servidor")
+            return
+        }
+        bg {
+            val resp = api.checkoutOrder(
+                CheckoutOrderRequest(
+                    items = items,
+                    destination = destination,
+                    fare = fare,
+                    client_name = clientName,
+                    dest_lat = destLat,
+                    dest_lng = destLng,
+                    buyer_email = buyerEmail,
+                    buyer_phone = buyerPhone,
+                    buyer_document = buyerDocument
+                )
+            ).execute()
+            if (resp.isSuccessful) {
+                val order = resp.body()!!
+                serverOrderId = order.id
+                lastCheckoutUrl = order.checkout_url
+                main.post { onSuccess(order) }
+            } else {
+                val msg = resp.errorBody()?.string()?.take(200) ?: "HTTP ${resp.code()}"
+                main.post { onError(msg) }
+            }
+        }
+    }
+
+    fun fetchPaymentStatus(
+        orderId: Int,
+        onSuccess: (PaymentStatusDto) -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
+        val api = ApiClient.api ?: run { onError("Sin conexión"); return }
+        bg {
+            val resp = api.getPaymentStatus(orderId).execute()
+            if (resp.isSuccessful) main.post { onSuccess(resp.body()!!) }
+            else main.post { onError("HTTP ${resp.code()}") }
+        }
+    }
 
     fun createOrder(
         items: String, destination: String, fare: Double,

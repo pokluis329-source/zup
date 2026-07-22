@@ -87,6 +87,11 @@ class Order(db.Model):
     dest_lat     = db.Column(db.Float, default=0.0)            # coords de entrega (mapa)
     dest_lng     = db.Column(db.Float, default=0.0)
     fare         = db.Column(db.Float, nullable=False)       # tarifa en USD
+    amount_gs    = db.Column(db.Integer, default=0)           # monto cobrado en Gs
+
+    payment_status = db.Column(db.String(24), default="AWAITING_PAYMENT")
+    # AWAITING_PAYMENT → PAID | FAILED | REFUNDED
+    pagopar_hash   = db.Column(db.String(128), nullable=True)
 
     status       = db.Column(db.String(20), default="PENDING")
     # PENDING → ACCEPTED → PICKED_UP → DELIVERING → COMPLETED / CANCELLED
@@ -94,6 +99,8 @@ class Order(db.Model):
     driver_id    = db.Column(db.Integer, db.ForeignKey("drivers.id"), nullable=True)
     driver_name  = db.Column(db.String(100), nullable=True)
     driver_vehicle = db.Column(db.String(100), nullable=True)
+
+    paid_at      = db.Column(db.DateTime, nullable=True)
 
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
     accepted_at  = db.Column(db.DateTime, nullable=True)
@@ -109,7 +116,14 @@ class Order(db.Model):
             "dest_lat":       self.dest_lat or 0.0,
             "dest_lng":       self.dest_lng or 0.0,
             "fare":           self.fare,
-            "fare_gs":        int(self.fare * 7300),
+            "fare_gs":        self.amount_gs or int(self.fare * 7300),
+            "amount_gs":      self.amount_gs or int(self.fare * 7300),
+            "payment_status": self.payment_status,
+            "pagopar_hash":   self.pagopar_hash,
+            "checkout_url":   (
+                f"https://www.pagopar.com/pagos/{self.pagopar_hash}"
+                if self.pagopar_hash else None
+            ),
             "status":         self.status,
             "driver_id":      self.driver_id,
             "driver_name":    self.driver_name,
@@ -118,6 +132,7 @@ class Order(db.Model):
             "accepted_at":    self.accepted_at.isoformat() if self.accepted_at else None,
             "picked_up_at":   self.picked_up_at.isoformat() if self.picked_up_at else None,
             "completed_at":   self.completed_at.isoformat() if self.completed_at else None,
+            "paid_at":        self.paid_at.isoformat() if self.paid_at else None,
         }
 
 
