@@ -6,10 +6,10 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/zuppon/backend
-EnvironmentFile=/var/www/zuppon/backend/.env
+WorkingDirectory=/var/www/zup/backend
+EnvironmentFile=/var/www/zup/backend/.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/var/www/zuppon/backend/venv/bin/gunicorn \
+ExecStart=/var/www/zup/backend/venv/bin/gunicorn \
     --worker-class eventlet \
     --workers 1 \
     --bind 127.0.0.1:5000 \

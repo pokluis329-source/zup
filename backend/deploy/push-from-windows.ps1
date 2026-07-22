@@ -3,7 +3,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Server,
-    [string]$RemotePath = "/var/www/zuppon"
+    [string]$RemotePath = "/var/www/zup"
 )
 
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent

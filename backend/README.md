@@ -26,8 +26,8 @@ Resumen:
 
 ```bash
 # En el VPS
-sudo bash /var/www/zuppon/backend/deploy/setup-vps.sh   # primera vez
-sudo bash /var/www/zuppon/backend/deploy/update.sh      # cada actualización
+sudo bash /var/www/zup/backend/deploy/setup-vps.sh   # primera vez
+sudo bash /var/www/zup/backend/deploy/update.sh      # cada actualización
 sudo certbot --nginx -d institutocaacupepy.es -d www.institutocaacupepy.es
 ```
 

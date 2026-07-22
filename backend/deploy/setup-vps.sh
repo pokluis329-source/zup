@@ -5,22 +5,27 @@
 set -euo pipefail
 
 DOMAIN="institutocaacupepy.es"
-APP_DIR="/var/www/zuppon"
-REPO_URL="${REPO_URL:-}"   # opcional: git clone URL
+APP_DIR="/var/www/zup"
+REPO_URL="${REPO_URL:-}"
 
 echo "==> Paquetes del sistema"
 apt-get update
 apt-get install -y python3 python3-venv python3-pip nginx certbot python3-certbot-nginx git
 
 echo "==> Directorios"
-mkdir -p /var/log/zuppon
-chown www-data:www-data /var/log/zuppon
+mkdir -p /var/log/zuppon "$APP_DIR"
+chown www-data:www-data /var/log/zuppon 2>/dev/null || true
 
-if [ ! -d "$APP_DIR/.git" ] && [ -n "$REPO_URL" ]; then
-  git clone "$REPO_URL" "$APP_DIR"
-elif [ ! -d "$APP_DIR/backend" ]; then
-  echo "Copiá el proyecto a $APP_DIR (git clone o rsync) y volvé a correr update.sh"
-  mkdir -p "$APP_DIR"
+if [ ! -f "$APP_DIR/backend/deploy/nginx-zuppon.conf" ]; then
+  echo ""
+  echo "ERROR: No está el código en $APP_DIR"
+  echo "Primero subí el proyecto. Desde tu PC (PowerShell):"
+  echo "  cd backend\\deploy"
+  echo "  .\\push-from-windows.ps1 -Server root@TU_IP"
+  echo ""
+  echo "O en el VPS:"
+  echo "  git clone https://github.com/TU_USUARIO/zup.git $APP_DIR"
+  exit 1
 fi
 
 echo "==> Nginx"
@@ -36,8 +41,7 @@ systemctl enable zuppon
 
 echo ""
 echo "Próximos pasos:"
-echo "  1. Crear $APP_DIR/backend/.env (copiar de .env.example + tokens Pagopar)"
+echo "  1. nano $APP_DIR/backend/.env   (tokens Pagopar + PUBLIC_BASE_URL)"
 echo "  2. bash $APP_DIR/backend/deploy/update.sh"
-echo "  3. certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos -m TU_EMAIL"
-echo "  4. En .env: PUBLIC_BASE_URL=https://$DOMAIN"
-echo "  5. En panel Pagopar webhook: https://$DOMAIN/api/payments/pagopar/webhook"
+echo "  3. certbot --nginx -d $DOMAIN   (SIN www — no tiene DNS)"
+echo "  4. Pagopar webhook: https://$DOMAIN/api/payments/pagopar/webhook"

@@ -1,9 +1,9 @@
 #!/bin/bash
 # ── Zuppon — actualizar código y reiniciar servicio ──
-# En el VPS:  bash /var/www/zuppon/backend/deploy/update.sh
+# En el VPS:  bash /var/www/zup/backend/deploy/update.sh
 set -euo pipefail
 
-APP_DIR="/var/www/zuppon"
+APP_DIR="/var/www/zup"
 BACKEND="$APP_DIR/backend"
 
 cd "$APP_DIR"

@@ -14,7 +14,7 @@ Desde tu PC con **Git** en el servidor (recomendado):
 
 ```bash
 # En el VPS — primera vez
-git clone https://github.com/TU_USUARIO/zup.git /var/www/zuppon
+git clone https://github.com/TU_USUARIO/zup.git /var/www/zup
 ```
 
 Desde Windows con **OpenSSH** (PowerShell):
@@ -31,7 +31,7 @@ cd backend\deploy
 En el VPS:
 
 ```bash
-cd /var/www/zuppon/backend/deploy
+cd /var/www/zup/backend/deploy
 chmod +x setup-vps.sh update.sh
 sudo bash setup-vps.sh
 ```
@@ -39,14 +39,14 @@ sudo bash setup-vps.sh
 ## 3. Configurar `.env` en el servidor
 
 ```bash
-sudo nano /var/www/zuppon/backend/.env
+sudo nano /var/www/zup/backend/.env
 ```
 
 Contenido mínimo:
 
 ```env
 SECRET_KEY=genera-un-secreto-largo-aqui
-DATABASE_URL=sqlite:////var/www/zuppon/backend/zuppon.db
+DATABASE_URL=sqlite:////var/www/zup/backend/zuppon.db
 
 PAGOPAR_PUBLIC_KEY=tu_token_publico
 PAGOPAR_PRIVATE_KEY=tu_token_privado
@@ -62,20 +62,20 @@ PUBLIC_BASE_URL=https://institutocaacupepy.es
 Permisos:
 
 ```bash
-sudo chown www-data:www-data /var/www/zuppon/backend/.env
-sudo chmod 600 /var/www/zuppon/backend/.env
+sudo chown www-data:www-data /var/www/zup/backend/.env
+sudo chmod 600 /var/www/zup/backend/.env
 ```
 
 ## 4. Desplegar / actualizar
 
 ```bash
-sudo bash /var/www/zuppon/backend/deploy/update.sh
+sudo bash /var/www/zup/backend/deploy/update.sh
 ```
 
 ## 5. SSL con Let's Encrypt
 
 ```bash
-sudo certbot --nginx -d institutocaacupepy.es -d www.institutocaacupepy.es
+sudo certbot --nginx -d institutocaacupepy.es
 ```
 
 Certbot configura HTTPS y el redirect HTTP → HTTPS.
