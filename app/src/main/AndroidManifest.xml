@@ -44,13 +44,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Bienvenida / login -->
-        <activity
-            android:name=".LoginActivity"
-            android:exported="false"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.Zuppon" />
-
         <!-- Bienvenida -->
         <activity
             android:name=".RoleSelectionActivity"
