@@ -10,8 +10,9 @@ WorkingDirectory=/var/www/zup/backend
 EnvironmentFile=-/var/www/zup/backend/.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/var/www/zup/backend/venv/bin/gunicorn \
-    --worker-class eventlet \
+    --worker-class gthread \
     --workers 1 \
+    --threads 4 \
     --bind 127.0.0.1:5003 \
     --timeout 120 \
     wsgi:app
