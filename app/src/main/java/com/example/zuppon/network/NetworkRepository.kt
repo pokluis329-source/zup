@@ -8,6 +8,7 @@ import android.util.Log
 import com.example.zuppon.model.PaymentMessage
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 object NetworkRepository {
@@ -108,12 +109,49 @@ object NetworkRepository {
 
     fun uploadReceipt(
         orderId: Int,
+        imageBytes: ByteArray,
+        mimeType: String = "image/jpeg",
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        bg {
+            try {
+                val ext = when {
+                    mimeType.contains("png") -> "png"
+                    mimeType.contains("webp") -> "webp"
+                    else -> "jpg"
+                }
+                val media = mimeType.toMediaTypeOrNull() ?: "image/jpeg".toMediaTypeOrNull()!!
+                val fileBody = imageBytes.toRequestBody(media)
+                val multipart = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("image", "receipt.$ext", fileBody)
+                    .build()
+
+                val url = "${ApiClient.BASE_URL.trimEnd('/')}/api/orders/$orderId/messages/receipt"
+                val request = Request.Builder().url(url).post(multipart).build()
+                ApiClient.okHttp.newCall(request).execute().use { resp ->
+                    val raw = resp.body?.string().orEmpty()
+                    if (resp.isSuccessful) {
+                        main.post { onSuccess() }
+                    } else {
+                        val msg = parseUploadError(raw, resp.code)
+                        main.post { onError(msg) }
+                    }
+                }
+            } catch (e: Exception) {
+                main.post { onError(e.message ?: "Error al subir") }
+            }
+        }
+    }
+
+    fun uploadReceipt(
+        orderId: Int,
         contentResolver: ContentResolver,
         uri: Uri,
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        val api = ApiClient.api ?: run { onError("Sin conexión"); return }
         bg {
             try {
                 val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -122,23 +160,22 @@ object NetworkRepository {
                         return@bg
                     }
                 val mime = contentResolver.getType(uri) ?: "image/jpeg"
-                val ext = when {
-                    mime.contains("png") -> "png"
-                    mime.contains("webp") -> "webp"
-                    else -> "jpg"
-                }
-                val body = bytes.toRequestBody(mime.toMediaTypeOrNull())
-                val part = MultipartBody.Part.createFormData("image", "receipt.$ext", body)
-                val resp = api.uploadReceipt(orderId, part).execute()
-                if (resp.isSuccessful) main.post { onSuccess() }
-                else {
-                    val msg = resp.errorBody()?.string()?.take(200) ?: "HTTP ${resp.code()}"
-                    main.post { onError(msg) }
-                }
+                uploadReceipt(orderId, bytes, mime, onSuccess, onError)
             } catch (e: Exception) {
-                main.post { onError(e.message ?: "Error al subir") }
+                main.post { onError(e.message ?: "Error al leer imagen") }
             }
         }
+    }
+
+    private fun parseUploadError(raw: String, code: Int): String {
+        if (raw.trimStart().startsWith("<")) {
+            return when (code) {
+                404 -> "Ruta de subida no encontrada en el servidor (404)"
+                413 -> "Imagen muy pesada para el servidor"
+                else -> "Error del servidor ($code). Actualizá el backend en el VPS."
+            }
+        }
+        return raw.take(180).ifBlank { "HTTP $code" }
     }
 
     fun cancelOrder(onDone: () -> Unit = {}) {

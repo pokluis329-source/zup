@@ -22,6 +22,33 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads", "receipts")
 ALLOWED_RECEIPT_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
 
 
+def _detect_image_ext(header: bytes, filename: str, content_type: str | None) -> str | None:
+    if header.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+        return "webp"
+    if header.startswith(b"GIF87a") or header.startswith(b"GIF89a"):
+        return "gif"
+
+    ct = (content_type or "").lower()
+    if "jpeg" in ct or "jpg" in ct:
+        return "jpg"
+    if "png" in ct:
+        return "png"
+    if "webp" in ct:
+        return "webp"
+
+    if filename and "." in filename:
+        ext = filename.rsplit(".", 1)[-1].lower()
+        if ext == "jpeg":
+            ext = "jpg"
+        if ext in ALLOWED_RECEIPT_EXT:
+            return ext
+    return None
+
+
 def _ensure_order_columns():
     """Migraciones ligeras para columnas nuevas en orders."""
     inspector = inspect(db.engine)
@@ -207,15 +234,21 @@ def upload_receipt(order_id):
         return jsonify({"error": "El pedido ya está pagado"}), 409
 
     file = request.files.get("image") or request.files.get("file")
-    if not file or not file.filename:
+    if not file:
         return jsonify({"error": "Falta la imagen del comprobante"}), 400
 
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ALLOWED_RECEIPT_EXT:
+    header = file.stream.read(12)
+    file.stream.seek(0)
+    ext = _detect_image_ext(header, file.filename, file.content_type)
+    if not ext:
         return jsonify({"error": "Formato no permitido (jpg, png, webp)"}), 400
 
     filename = f"{order_id}_{uuid.uuid4().hex[:12]}.{ext}"
-    file.save(os.path.join(UPLOAD_DIR, filename))
+    dest = os.path.join(UPLOAD_DIR, filename)
+    try:
+        file.save(dest)
+    except OSError as exc:
+        return jsonify({"error": f"No se pudo guardar la imagen: {exc}"}), 500
 
     msg = PaymentMessage(
         order_id=order.id,

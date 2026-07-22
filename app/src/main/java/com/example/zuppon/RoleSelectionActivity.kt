@@ -7,9 +7,10 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import androidx.appcompat.app.AppCompatActivity
 import com.example.zuppon.databinding.ActivityRoleSelectionBinding
-import com.example.zuppon.ui.driver.DriverActivity
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.example.zuppon.ui.passenger.PassengerActivity
-import com.example.zuppon.util.AssetImageLoader
+import com.example.zuppon.util.UserSession
 
 class RoleSelectionActivity : AppCompatActivity() {
 
@@ -19,6 +20,20 @@ class RoleSelectionActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityRoleSelectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val userName = UserSession.name(this).ifBlank { "Invitado" }
+        binding.tvSelectRole.text = "Hola, $userName · ¿quién eres hoy?"
+
+        binding.btnLogout.setOnClickListener {
+            UserSession.clear(this)
+            GoogleSignIn.getClient(
+                this,
+                GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+            ).signOut().addOnCompleteListener {
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
+            }
+        }
 
         // Foto hero real
         AssetImageLoader.load(this, "hero.webp", binding.ivWelcomePhoto)

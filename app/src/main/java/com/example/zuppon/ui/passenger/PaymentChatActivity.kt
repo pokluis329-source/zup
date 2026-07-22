@@ -1,6 +1,8 @@
 package com.example.zuppon.ui.passenger
 
 import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -22,6 +24,7 @@ import com.example.zuppon.network.ApiClient
 import com.example.zuppon.network.NetworkRepository
 import com.example.zuppon.repository.TripRepository
 import java.net.URL
+import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -113,17 +116,57 @@ class PaymentChatActivity : AppCompatActivity() {
 
     private fun uploadReceipt(uri: Uri) {
         Toast.makeText(this, "Enviando comprobante…", Toast.LENGTH_SHORT).show()
-        NetworkRepository.uploadReceipt(orderId, contentResolver, uri,
-            onSuccess = {
+        Thread {
+            val compressed = compressImage(uri)
+            if (compressed == null) {
                 main.post {
-                    Toast.makeText(this, "Comprobante enviado ✅", Toast.LENGTH_SHORT).show()
-                    loadMessages()
+                    Toast.makeText(this, "No se pudo procesar la imagen", Toast.LENGTH_LONG).show()
                 }
-            },
-            onError = { msg ->
-                main.post { Toast.makeText(this, msg, Toast.LENGTH_LONG).show() }
+                return@Thread
             }
-        )
+            NetworkRepository.uploadReceipt(
+                orderId,
+                compressed.first,
+                compressed.second,
+                onSuccess = {
+                    main.post {
+                        Toast.makeText(this, "Comprobante enviado ✅", Toast.LENGTH_SHORT).show()
+                        loadMessages()
+                    }
+                },
+                onError = { msg ->
+                    main.post { Toast.makeText(this, msg, Toast.LENGTH_LONG).show() }
+                }
+            )
+        }.start()
+    }
+
+    private fun compressImage(uri: Uri): Pair<ByteArray, String>? {
+        val original = contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it)
+        } ?: return null
+
+        val maxSide = 1600
+        val scaled = if (original.width > maxSide || original.height > maxSide) {
+            val ratio = minOf(
+                maxSide.toFloat() / original.width,
+                maxSide.toFloat() / original.height
+            )
+            Bitmap.createScaledBitmap(
+                original,
+                (original.width * ratio).toInt().coerceAtLeast(1),
+                (original.height * ratio).toInt().coerceAtLeast(1),
+                true
+            )
+        } else {
+            original
+        }
+
+        val out = ByteArrayOutputStream()
+        scaled.compress(Bitmap.CompressFormat.JPEG, 82, out)
+        if (scaled !== original) scaled.recycle()
+        original.recycle()
+        return out.toByteArray() to "image/jpeg"
     }
 
     private fun startPaymentPolling() {

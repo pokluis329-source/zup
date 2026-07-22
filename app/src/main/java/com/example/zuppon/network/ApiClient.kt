@@ -12,8 +12,11 @@ object ApiClient {
     const val BASE_URL = "https://institutocaacupepy.es/"
     private const val TAG = "ApiClient"
 
-    private val httpClient: OkHttpClient by lazy {
-        try {
+    /** Cliente HTTP compartido (subidas multipart, etc.) */
+    val okHttp: OkHttpClient by lazy { buildHttpClient() }
+
+    private fun buildHttpClient(): OkHttpClient {
+        return try {
             OkHttpClient.Builder()
                 .apply {
                     val isDebuggable = (0 != (android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE
@@ -29,20 +32,22 @@ object ApiClient {
                         })
                     }
                 }
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .writeTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .connectionPool(okhttp3.ConnectionPool(5, 60, TimeUnit.SECONDS))
                 .build()
         } catch (e: Exception) {
             Log.w(TAG, "OkHttp init failed: ${e.message}")
             OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .writeTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .build()
         }
     }
+
+    private val httpClient: OkHttpClient get() = okHttp
 
     /** null si Retrofit no se pudo inicializar (JARs faltantes) */
     val api: ApiService? by lazy {

@@ -24,6 +24,7 @@ import com.example.zuppon.RoleSelectionActivity
 import com.example.zuppon.databinding.ActivityPassengerBinding
 import com.example.zuppon.model.FoodMenu
 import com.example.zuppon.model.TripState
+import com.example.zuppon.util.UserSession
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -693,6 +694,11 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         val addr = binding.etDestination.text?.toString() ?: ""
         binding.etDeliveryAddress.setText(addr)
         buildCartSummaryView()
+        UserSession.name(this).takeIf { it.isNotBlank() && it != "Invitado" }?.let { name ->
+            if (binding.etBuyerName.text.isNullOrBlank()) {
+                binding.etBuyerName.setText(name)
+            }
+        }
         // Desde este momento el GPS no puede pisar la posición — el mapa manda
         confirmLocationLocked = true
         // Si el mapa ya existe, centrarlo en la posición GPS actual

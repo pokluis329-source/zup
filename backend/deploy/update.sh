@@ -23,6 +23,9 @@ python3 -m venv venv
 ./venv/bin/pip install -q -U pip
 ./venv/bin/pip install -q -r requirements.txt
 
+mkdir -p "$BACKEND/uploads/receipts"
+chown -R www-data:www-data "$BACKEND/uploads" 2>/dev/null || true
+
 # Instalar/actualizar unit systemd
 cp "$BACKEND/deploy/zup.service" /etc/systemd/system/zup.service
 systemctl daemon-reload
