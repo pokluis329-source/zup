@@ -526,6 +526,7 @@ def health():
         "status": "ok",
         "app": "Zuppon Backend",
         "payment": payment_config.payment_info(),
+        "google_auth": bool(auth.google_client_id()),
     })
 
 

@@ -13,6 +13,9 @@ PAYMENT_ALIAS=zup.cacupe
 PAYMENT_CEDULA=6208713
 PAYMENT_HOLDER=Zup Delivery
 GS_RATE=7300
+
+# Google Sign-In (Web Client ID)
+GOOGLE_CLIENT_ID=820711440075-q4e0tqhg3vjf6d9bfgavo0od60hrbkd6.apps.googleusercontent.com
 EOF
 
 chmod 640 "$ENV_FILE"

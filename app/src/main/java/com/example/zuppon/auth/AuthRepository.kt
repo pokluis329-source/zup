@@ -80,7 +80,7 @@ object AuthRepository {
                 main.post { onSuccess(user) }
             } else {
                 val raw = resp.errorBody()?.string().orEmpty()
-                val msg = parseError(raw, resp.code)
+                val msg = parseError(raw, resp.code())
                 main.post { onError(msg) }
             }
         }
