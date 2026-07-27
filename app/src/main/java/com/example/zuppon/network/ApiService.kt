@@ -117,11 +117,16 @@ interface ApiService {
     fun authGoogle(@Body body: GoogleAuthRequest): Call<AuthResponse>
 
     @GET("api/v1/auth/me")
-    fun authMe(@Header("Authorization") authorization: String): Call<UserResponse>
+    fun authMe(
+        @Header("Authorization") authorization: String,
+        @Header("X-Access-Token") accessToken: String,
+        @Query("access_token") accessTokenQuery: String
+    ): Call<UserResponse>
 
     @POST("api/v1/users/username")
     fun setUsername(
         @Header("Authorization") authorization: String,
+        @Header("X-Access-Token") accessToken: String,
         @Body body: UsernameRequest
     ): Call<UserResponse>
 

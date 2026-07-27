@@ -68,6 +68,23 @@ sudo mkdir -p /var/www/zup/backend/uploads/receipts
 sudo chown -R www-data:www-data /var/www/zup/backend/uploads
 ```
 
+## Login Google — nginx (HTTPS)
+
+Si al guardar username dice **"Token inválido o expirado"**, nginx suele estar
+bloqueando el header `Authorization`. En el bloque **443** de nginx agregá:
+
+```nginx
+proxy_set_header Authorization $http_authorization;
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+sudo systemctl restart zup
+```
+
+La app también envía el token en el body (`access_token`) y en `X-Access-Token`
+como respaldo, pero conviene arreglar nginx igual.
+
 ## 4. Desplegar / actualizar
 
 ```bash

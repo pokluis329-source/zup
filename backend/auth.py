@@ -2,7 +2,8 @@
 
 import os
 import re
-from datetime import datetime, timedelta
+import time
+from datetime import timedelta
 from functools import wraps
 
 import jwt
@@ -22,11 +23,11 @@ def google_client_id() -> str:
 
 
 def create_access_token(user_id: int) -> str:
-    now = datetime.utcnow()
+    now = int(time.time())
     payload = {
-        "sub": user_id,
+        "sub": str(user_id),
         "iat": now,
-        "exp": now + timedelta(days=30),
+        "exp": now + int(timedelta(days=30).total_seconds()),
     }
     token = jwt.encode(payload, _secret(), algorithm="HS256")
     if isinstance(token, bytes):
@@ -35,9 +36,20 @@ def create_access_token(user_id: int) -> str:
 
 
 def decode_access_token(token: str) -> int | None:
+    token = (token or "").strip()
+    if not token:
+        return None
     try:
-        payload = jwt.decode(token, _secret(), algorithms=["HS256"])
-        return int(payload["sub"])
+        payload = jwt.decode(
+            token,
+            _secret(),
+            algorithms=["HS256"],
+            leeway=30,
+        )
+        sub = payload.get("sub")
+        if sub is None:
+            return None
+        return int(sub)
     except (jwt.PyJWTError, TypeError, ValueError):
         return None
 
@@ -58,11 +70,33 @@ def validate_username(value: str) -> str | None:
     return username
 
 
-def bearer_user_id():
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
+def extract_access_token() -> str | None:
+    """Lee JWT desde header Authorization, X-Access-Token o body JSON."""
+    auth = (request.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        if token:
+            return token
+
+    x_token = (request.headers.get("X-Access-Token") or "").strip()
+    if x_token:
+        return x_token
+
+    data = request.get_json(silent=True) or {}
+    for key in ("access_token", "token"):
+        val = data.get(key)
+        if val:
+            return str(val).strip()
+
+    q = (request.args.get("access_token") or request.args.get("token") or "").strip()
+    return q or None
+
+
+def bearer_user_id() -> int | None:
+    token = extract_access_token()
+    if not token:
         return None
-    return decode_access_token(auth[7:].strip())
+    return decode_access_token(token)
 
 
 def require_auth(f):

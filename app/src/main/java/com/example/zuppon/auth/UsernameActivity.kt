@@ -60,6 +60,14 @@ class UsernameActivity : AppCompatActivity() {
                 setLoading(false)
                 tilUsername.error = msg
                 Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                if (msg.contains("Token", ignoreCase = true) ||
+                    msg.contains("expirad", ignoreCase = true) ||
+                    msg.contains("Sesión", ignoreCase = true)
+                ) {
+                    UserSession.clear()
+                    startActivity(Intent(this, LoginActivity::class.java))
+                    finish()
+                }
             }
         )
     }

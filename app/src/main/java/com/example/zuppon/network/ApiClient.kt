@@ -23,15 +23,18 @@ object ApiClient {
             OkHttpClient.Builder()
                 .apply {
                     addInterceptor { chain ->
-                        val token = authTokenProvider()
-                        val request = if (!token.isNullOrBlank()) {
-                            chain.request().newBuilder()
-                                .header("Authorization", "Bearer $token")
-                                .build()
-                        } else {
-                            chain.request()
+                        val token = authTokenProvider()?.trim()
+                        val builder = chain.request().newBuilder()
+                        if (!token.isNullOrBlank()) {
+                            val bearer = if (token.startsWith("Bearer ", ignoreCase = true)) {
+                                token
+                            } else {
+                                "Bearer $token"
+                            }
+                            builder.header("Authorization", bearer)
+                            builder.header("X-Access-Token", token.removePrefix("Bearer ").trim())
                         }
-                        chain.proceed(request)
+                        chain.proceed(builder.build())
                     }
                     val isDebuggable = (0 != (android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE
                         and (try {
@@ -55,15 +58,14 @@ object ApiClient {
             Log.w(TAG, "OkHttp init failed: ${e.message}")
             OkHttpClient.Builder()
                 .addInterceptor { chain ->
-                    val token = authTokenProvider()
-                    val request = if (!token.isNullOrBlank()) {
-                        chain.request().newBuilder()
-                            .header("Authorization", "Bearer $token")
-                            .build()
-                    } else {
-                        chain.request()
+                    val token = authTokenProvider()?.trim()
+                    val builder = chain.request().newBuilder()
+                    if (!token.isNullOrBlank()) {
+                        val bearer = if (token.startsWith("Bearer ", ignoreCase = true)) token else "Bearer $token"
+                        builder.header("Authorization", bearer)
+                        builder.header("X-Access-Token", token.removePrefix("Bearer ").trim())
                     }
-                    chain.proceed(request)
+                    chain.proceed(builder.build())
                 }
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)

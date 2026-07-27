@@ -25,5 +25,6 @@ data class GoogleAuthRequest(
 )
 
 data class UsernameRequest(
-    val username: String
+    val username: String,
+    val access_token: String = ""
 )

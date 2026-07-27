@@ -20,8 +20,13 @@ object AuthRepository {
         }.start()
     }
 
-    private fun bearerOrNull(): String? =
-        UserSession.getToken()?.takeIf { it.isNotBlank() }?.let { "Bearer $it" }
+    private fun rawToken(): String? =
+        UserSession.getToken()?.trim()?.takeIf { it.isNotBlank() }
+
+    private fun bearerHeader(): String {
+        val token = rawToken().orEmpty()
+        return if (token.startsWith("Bearer ", ignoreCase = true)) token else "Bearer $token"
+    }
 
     fun loginWithGoogle(
         idToken: String,
@@ -36,8 +41,13 @@ object AuthRepository {
             val resp = api.authGoogle(GoogleAuthRequest(idToken)).execute()
             if (resp.isSuccessful) {
                 val body = resp.body()!!
-                UserSession.save(body.token, body.user)
-                main.post { onSuccess(body) }
+                val token = body.token.trim()
+                if (token.isBlank()) {
+                    main.post { onError("El servidor no devolvió un token válido") }
+                    return@bg
+                }
+                UserSession.save(token, body.user)
+                main.post { onSuccess(body.copy(token = token)) }
             } else {
                 val msg = resp.errorBody()?.string()?.take(200) ?: "HTTP ${resp.code()}"
                 main.post { onError(msg) }
@@ -49,8 +59,8 @@ object AuthRepository {
         onSuccess: (AuthUser) -> Unit,
         onError: (String) -> Unit = {}
     ) {
-        val auth = bearerOrNull()
-        if (auth == null) {
+        val token = rawToken()
+        if (token == null) {
             onError("Sesión expirada")
             return
         }
@@ -59,7 +69,7 @@ object AuthRepository {
             return
         }
         bg {
-            val resp = api.authMe(auth).execute()
+            val resp = api.authMe(bearerHeader(), token, token).execute()
             if (resp.isSuccessful) {
                 val user = resp.body()!!.user
                 UserSession.updateUser(user)
@@ -75,8 +85,8 @@ object AuthRepository {
         onSuccess: (AuthUser) -> Unit,
         onError: (String) -> Unit
     ) {
-        val auth = bearerOrNull()
-        if (auth == null) {
+        val token = rawToken()
+        if (token == null) {
             onError("Sesión expirada. Volvé a iniciar sesión con Google.")
             return
         }
@@ -85,7 +95,11 @@ object AuthRepository {
             return
         }
         bg {
-            val resp = api.setUsername(auth, UsernameRequest(username)).execute()
+            val resp = api.setUsername(
+                bearerHeader(),
+                token,
+                UsernameRequest(username = username, access_token = token)
+            ).execute()
             if (resp.isSuccessful) {
                 val user = resp.body()!!.user
                 UserSession.updateUser(user)
