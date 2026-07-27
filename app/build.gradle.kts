@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.androidx.recyclerview)
     implementation(libs.play.services.maps)
     implementation(libs.play.services.location)
+    implementation(libs.play.services.auth)
     implementation(libs.places)
 
     // Retrofit + OkHttp + okio 3.x — JARs locales (sin red)

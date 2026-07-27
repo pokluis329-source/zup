@@ -44,6 +44,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Login Google -->
+        <activity
+            android:name=".auth.LoginActivity"
+            android:exported="false"
+            android:label="Iniciar sesión"
+            android:theme="@style/Theme.Zuppon" />
+
+        <activity
+            android:name=".auth.UsernameActivity"
+            android:exported="false"
+            android:label="Elegir username"
+            android:theme="@style/Theme.Zuppon" />
+
         <!-- Bienvenida -->
         <activity
             android:name=".RoleSelectionActivity"

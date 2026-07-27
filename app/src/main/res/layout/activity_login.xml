@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/zuppon_primary"
+    android:padding="28dp"
+    android:gravity="center_horizontal">
+
+    <ImageView
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:src="@drawable/logo"
+        android:contentDescription="@string/app_name"
+        android:layout_marginTop="48dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Bienvenido a Zuppon"
+        android:textColor="@color/white"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:layout_marginTop="24dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Iniciá sesión con Google para guardar tus pedidos y seguir el chat de pago."
+        android:textColor="@color/zuppon_text_secondary"
+        android:textSize="15sp"
+        android:gravity="center"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="36dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_google_sign_in"
+        style="@style/ZupponButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Continuar con Google" />
+
+    <ProgressBar
+        android:id="@+id/progress_login"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:visibility="gone"
+        android:indeterminateTint="@color/zuppon_yellow" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_explore_guest"
+        style="@style/ZupponButtonOutline"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Explorar sin sesión"
+        android:layout_marginBottom="16dp" />
+
+</LinearLayout>

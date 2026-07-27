@@ -158,6 +158,27 @@ class PaymentMessage(db.Model):
         return data
 
 
+class User(db.Model):
+    __tablename__ = "users"
+
+    id            = db.Column(db.Integer, primary_key=True)
+    google_id     = db.Column(db.String(128), unique=True, nullable=False)
+    email         = db.Column(db.String(255), nullable=True)
+    display_name  = db.Column(db.String(255), nullable=True)
+    username      = db.Column(db.String(30), unique=True, nullable=True)
+    password_hash = db.Column(db.String(255), nullable=True)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id":             self.id,
+            "email":          self.email,
+            "display_name":   self.display_name,
+            "username":       self.username,
+            "needs_username": self.username is None,
+        }
+
+
 class Driver(db.Model):
     __tablename__ = "drivers"
 

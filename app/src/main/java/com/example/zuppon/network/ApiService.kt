@@ -1,5 +1,9 @@
 package com.example.zuppon.network
 
+import com.example.zuppon.model.AuthResponse
+import com.example.zuppon.model.GoogleAuthRequest
+import com.example.zuppon.model.UserResponse
+import com.example.zuppon.model.UsernameRequest
 import retrofit2.Call
 import retrofit2.http.*
 import okhttp3.MultipartBody
@@ -108,6 +112,15 @@ data class MenuItemDto(
 )
 
 interface ApiService {
+
+    @POST("api/v1/auth/google")
+    fun authGoogle(@Body body: GoogleAuthRequest): Call<AuthResponse>
+
+    @GET("api/v1/auth/me")
+    fun authMe(): Call<UserResponse>
+
+    @POST("api/v1/users/username")
+    fun setUsername(@Body body: UsernameRequest): Call<UserResponse>
 
     @GET("api/orders")
     fun getOrders(): Call<List<OrderDto>>

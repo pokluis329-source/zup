@@ -15,8 +15,9 @@ from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 from sqlalchemy import inspect, text
 
-from database import db, Order, Driver, MenuItem, PaymentMessage, MENU_SEED
+from database import db, Order, Driver, MenuItem, PaymentMessage, User, MENU_SEED
 import payment_config
+import auth
 
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads", "receipts")
 ALLOWED_RECEIPT_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
@@ -132,6 +133,67 @@ with app.app_context():
                 emoji=row[4], category=row[5], is_popular=row[6], asset_image=row[7]
             ))
         db.session.commit()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  REST — Auth (Google + username)
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/v1/auth/google", methods=["POST"])
+def auth_google():
+    data = request.get_json() or {}
+    raw_token = (data.get("id_token") or "").strip()
+    if not raw_token:
+        return jsonify({"error": "Falta id_token"}), 400
+
+    try:
+        claims = auth.verify_google_id_token(raw_token)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 401
+
+    google_id = claims.get("sub")
+    if not google_id:
+        return jsonify({"error": "Token de Google inválido"}), 401
+
+    user = User.query.filter_by(google_id=google_id).first()
+    if not user:
+        user = User(
+            google_id=google_id,
+            email=claims.get("email"),
+            display_name=claims.get("name"),
+        )
+        db.session.add(user)
+        db.session.commit()
+
+    token = auth.create_access_token(user.id)
+    return jsonify({"token": token, "user": user.to_dict()})
+
+
+@app.route("/api/v1/auth/me", methods=["GET"])
+@auth.require_auth
+def auth_me(user):
+    return jsonify({"user": user.to_dict()})
+
+
+@app.route("/api/v1/users/username", methods=["POST"])
+@auth.require_auth
+def set_username(user):
+    if user.username:
+        return jsonify({"error": "Ya tenés username"}), 409
+
+    data = request.get_json() or {}
+    username = auth.validate_username(data.get("username", ""))
+    if not username:
+        return jsonify({
+            "error": "Username inválido (3–30 caracteres, solo a-z, 0-9, _)"
+        }), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"error": "Ese username ya está en uso"}), 409
+
+    user.username = username
+    db.session.commit()
+    return jsonify({"user": user.to_dict()})
 
 
 # ═════════════════════════════════════════════════════════════════════════════

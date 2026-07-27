@@ -2,33 +2,32 @@ package com.example.zuppon
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import androidx.appcompat.app.AppCompatActivity
+import com.example.zuppon.auth.AuthRepository
+import com.example.zuppon.auth.LoginActivity
+import com.example.zuppon.auth.UsernameActivity
 import com.example.zuppon.databinding.ActivitySplashBinding
 import com.example.zuppon.util.AssetImageLoader
+import com.example.zuppon.util.UserSession
 
 class SplashActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySplashBinding
+    private var routed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivitySplashBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Cargar foto hero real desde assets
         AssetImageLoader.load(this, "hero.webp", binding.ivHero)
 
-        // Precalentar Retrofit + OkHttp en background para que la primera llamada
-        // de red no sufra el overhead de inicialización (~150-200ms)
         Thread { com.example.zuppon.network.ApiClient.api }.start()
 
-        // Animaciones de entrada
         binding.cardInfo.translationY = 300f
         binding.cardInfo.alpha = 0f
-
         binding.cardInfo.animate()
             .translationY(0f)
             .alpha(1f)
@@ -45,9 +44,41 @@ class SplashActivity : AppCompatActivity() {
             .setInterpolator(DecelerateInterpolator())
             .start()
 
-        binding.btnGetStarted.setOnClickListener {
-            startActivity(Intent(this, RoleSelectionActivity::class.java))
-            finish()
+        binding.btnGetStarted.setOnClickListener { routeFromSession() }
+
+        binding.root.postDelayed({ routeFromSession() }, 1200)
+    }
+
+    private fun routeFromSession() {
+        if (routed) return
+        routed = true
+
+        binding.btnGetStarted.isEnabled = false
+        binding.btnGetStarted.text = "Cargando…"
+
+        val token = UserSession.getToken()
+        if (token.isNullOrBlank()) {
+            goTo(LoginActivity::class.java)
+            return
         }
+
+        AuthRepository.fetchMe(
+            onSuccess = { user ->
+                if (user.needs_username) {
+                    goTo(UsernameActivity::class.java)
+                } else {
+                    goTo(RoleSelectionActivity::class.java)
+                }
+            },
+            onError = {
+                UserSession.clear()
+                goTo(LoginActivity::class.java)
+            }
+        )
+    }
+
+    private fun goTo(target: Class<*>) {
+        startActivity(Intent(this, target))
+        finish()
     }
 }

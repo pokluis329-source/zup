@@ -12,6 +12,9 @@ object ApiClient {
     const val BASE_URL = "https://institutocaacupepy.es/"
     private const val TAG = "ApiClient"
 
+    /** Provee el JWT para requests autenticados. */
+    var authTokenProvider: () -> String? = { null }
+
     /** Cliente HTTP compartido (subidas multipart, etc.) */
     val okHttp: OkHttpClient by lazy { buildHttpClient() }
 
@@ -19,6 +22,17 @@ object ApiClient {
         return try {
             OkHttpClient.Builder()
                 .apply {
+                    addInterceptor { chain ->
+                        val token = authTokenProvider()
+                        val request = if (!token.isNullOrBlank()) {
+                            chain.request().newBuilder()
+                                .header("Authorization", "Bearer $token")
+                                .build()
+                        } else {
+                            chain.request()
+                        }
+                        chain.proceed(request)
+                    }
                     val isDebuggable = (0 != (android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE
                         and (try {
                             Class.forName("android.app.ActivityThread")

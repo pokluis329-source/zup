@@ -2,6 +2,8 @@
     <string name="app_name">Zuppon</string>
 
     <string name="google_maps_key" translatable="false">AIzaSyAh7KqR2hw0DZ3MFQq1jUDzPVtYv3xVwKk</string>
+    <!-- Web Client ID — backend GOOGLE_CLIENT_ID y requestIdToken() -->
+    <string name="google_web_client_id" translatable="false">820711440075-q4e0tqhg3vjf6d9bfgavo0od60hrbkd6.apps.googleusercontent.com</string>
 
     <!-- Navigation drawer -->
     <string name="nav_header_title">Zuppon</string>
