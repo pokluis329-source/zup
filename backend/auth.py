@@ -28,7 +28,10 @@ def create_access_token(user_id: int) -> str:
         "iat": now,
         "exp": now + timedelta(days=30),
     }
-    return jwt.encode(payload, _secret(), algorithm="HS256")
+    token = jwt.encode(payload, _secret(), algorithm="HS256")
+    if isinstance(token, bytes):
+        token = token.decode("utf-8")
+    return token
 
 
 def decode_access_token(token: str) -> int | None:
@@ -65,12 +68,12 @@ def bearer_user_id():
 def require_auth(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        from database import User
+        from database import User, db
 
         user_id = bearer_user_id()
         if not user_id:
-            return jsonify({"error": "No autorizado"}), 401
-        user = User.query.get(user_id)
+            return jsonify({"error": "Token inválido o expirado"}), 401
+        user = db.session.get(User, user_id)
         if not user:
             return jsonify({"error": "Usuario no encontrado"}), 401
         return f(user, *args, **kwargs)

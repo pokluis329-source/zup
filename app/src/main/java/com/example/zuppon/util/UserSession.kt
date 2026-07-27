@@ -3,7 +3,6 @@ package com.example.zuppon.util
 import android.content.Context
 import com.example.zuppon.model.AuthUser
 import com.google.gson.Gson
-import org.json.JSONObject
 
 object UserSession {
 
@@ -23,14 +22,14 @@ object UserSession {
             ?.edit()
             ?.putString(KEY_TOKEN, token)
             ?.putString(KEY_USER, gson.toJson(user))
-            ?.apply()
+            ?.commit()
     }
 
     fun updateUser(user: AuthUser) {
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             ?.edit()
             ?.putString(KEY_USER, gson.toJson(user))
-            ?.apply()
+            ?.commit()
     }
 
     fun getToken(): String? =

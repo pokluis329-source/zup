@@ -54,6 +54,17 @@ object ApiClient {
         } catch (e: Exception) {
             Log.w(TAG, "OkHttp init failed: ${e.message}")
             OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    val token = authTokenProvider()
+                    val request = if (!token.isNullOrBlank()) {
+                        chain.request().newBuilder()
+                            .header("Authorization", "Bearer $token")
+                            .build()
+                    } else {
+                        chain.request()
+                    }
+                    chain.proceed(request)
+                }
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)

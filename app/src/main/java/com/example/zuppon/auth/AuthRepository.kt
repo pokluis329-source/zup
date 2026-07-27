@@ -5,7 +5,6 @@ import android.os.Looper
 import com.example.zuppon.model.AuthResponse
 import com.example.zuppon.model.AuthUser
 import com.example.zuppon.model.GoogleAuthRequest
-import com.example.zuppon.model.UserResponse
 import com.example.zuppon.model.UsernameRequest
 import com.example.zuppon.network.ApiClient
 import com.example.zuppon.util.UserSession
@@ -20,6 +19,9 @@ object AuthRepository {
             catch (_: Exception) { }
         }.start()
     }
+
+    private fun bearerOrNull(): String? =
+        UserSession.getToken()?.takeIf { it.isNotBlank() }?.let { "Bearer $it" }
 
     fun loginWithGoogle(
         idToken: String,
@@ -47,18 +49,23 @@ object AuthRepository {
         onSuccess: (AuthUser) -> Unit,
         onError: (String) -> Unit = {}
     ) {
+        val auth = bearerOrNull()
+        if (auth == null) {
+            onError("Sesión expirada")
+            return
+        }
         val api = ApiClient.api ?: run {
             onError("Sin conexión al servidor")
             return
         }
         bg {
-            val resp = api.authMe().execute()
+            val resp = api.authMe(auth).execute()
             if (resp.isSuccessful) {
                 val user = resp.body()!!.user
                 UserSession.updateUser(user)
                 main.post { onSuccess(user) }
             } else {
-                main.post { onError("HTTP ${resp.code()}") }
+                main.post { onError(parseError(resp.errorBody()?.string().orEmpty(), resp.code())) }
             }
         }
     }
@@ -68,20 +75,24 @@ object AuthRepository {
         onSuccess: (AuthUser) -> Unit,
         onError: (String) -> Unit
     ) {
+        val auth = bearerOrNull()
+        if (auth == null) {
+            onError("Sesión expirada. Volvé a iniciar sesión con Google.")
+            return
+        }
         val api = ApiClient.api ?: run {
             onError("Sin conexión al servidor")
             return
         }
         bg {
-            val resp = api.setUsername(UsernameRequest(username)).execute()
+            val resp = api.setUsername(auth, UsernameRequest(username)).execute()
             if (resp.isSuccessful) {
                 val user = resp.body()!!.user
                 UserSession.updateUser(user)
                 main.post { onSuccess(user) }
             } else {
                 val raw = resp.errorBody()?.string().orEmpty()
-                val msg = parseError(raw, resp.code())
-                main.post { onError(msg) }
+                main.post { onError(parseError(raw, resp.code())) }
             }
         }
     }
