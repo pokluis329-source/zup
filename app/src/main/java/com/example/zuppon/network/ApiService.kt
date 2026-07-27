@@ -130,6 +130,14 @@ interface ApiService {
         @Body body: UsernameRequest
     ): Call<UserResponse>
 
+    @GET("api/v1/users/me/orders")
+    fun getMyOrders(
+        @Header("Authorization") authorization: String,
+        @Header("X-Access-Token") accessToken: String,
+        @Query("active") active: Int? = null,
+        @Query("limit") limit: Int? = null
+    ): Call<List<OrderDto>>
+
     @GET("api/orders")
     fun getOrders(): Call<List<OrderDto>>
 

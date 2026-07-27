@@ -7,6 +7,7 @@ import com.example.zuppon.model.AuthUser
 import com.example.zuppon.model.GoogleAuthRequest
 import com.example.zuppon.model.UsernameRequest
 import com.example.zuppon.network.ApiClient
+import com.example.zuppon.network.OrderDto
 import com.example.zuppon.util.UserSession
 
 object AuthRepository {
@@ -47,7 +48,10 @@ object AuthRepository {
                     return@bg
                 }
                 UserSession.save(token, body.user)
-                main.post { onSuccess(body.copy(token = token)) }
+                main.post {
+                    com.example.zuppon.repository.TripRepository.reloadUserSession()
+                    onSuccess(body.copy(token = token))
+                }
             } else {
                 val msg = resp.errorBody()?.string()?.take(200) ?: "HTTP ${resp.code()}"
                 main.post { onError(msg) }
@@ -103,10 +107,42 @@ object AuthRepository {
             if (resp.isSuccessful) {
                 val user = resp.body()!!.user
                 UserSession.updateUser(user)
-                main.post { onSuccess(user) }
+                main.post {
+                    com.example.zuppon.repository.TripRepository.reloadUserSession()
+                    onSuccess(user)
+                }
             } else {
                 val raw = resp.errorBody()?.string().orEmpty()
                 main.post { onError(parseError(raw, resp.code())) }
+            }
+        }
+    }
+
+    fun fetchMyOrders(
+        activeOnly: Boolean = false,
+        onSuccess: (List<OrderDto>) -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
+        val token = rawToken()
+        if (token == null) {
+            onError("Sesión expirada")
+            return
+        }
+        val api = ApiClient.api ?: run {
+            onError("Sin conexión al servidor")
+            return
+        }
+        bg {
+            val resp = api.getMyOrders(
+                bearerHeader(),
+                token,
+                if (activeOnly) 1 else null,
+                50
+            ).execute()
+            if (resp.isSuccessful) {
+                main.post { onSuccess(resp.body().orEmpty()) }
+            } else {
+                main.post { onError(parseError(resp.errorBody()?.string().orEmpty(), resp.code())) }
             }
         }
     }

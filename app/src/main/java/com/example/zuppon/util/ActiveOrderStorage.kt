@@ -8,18 +8,19 @@ import org.json.JSONObject
 object ActiveOrderStorage {
 
     private const val PREFS = "zuppon_active_order"
-    private const val KEY = "active_order"
+
+    private fun key(): String = UserStorageScope.scopedKey("active_order")
 
     fun save(context: Context, order: ActiveOrder) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY, toJson(order).toString())
-            .apply()
+            .putString(key(), toJson(order).toString())
+            .commit()
     }
 
     fun load(context: Context): ActiveOrder? {
         val json = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY, null) ?: return null
+            .getString(key(), null) ?: return null
         return try {
             fromJson(JSONObject(json))
         } catch (_: Exception) {
@@ -30,8 +31,8 @@ object ActiveOrderStorage {
     fun clear(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .remove(KEY)
-            .apply()
+            .remove(key())
+            .commit()
     }
 
     private fun toJson(o: ActiveOrder) = JSONObject().apply {

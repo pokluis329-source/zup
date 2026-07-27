@@ -553,6 +553,9 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     // ── Listeners ─────────────────────────────────────────────────────────────
 
     private fun setupListeners() {
+        binding.btnAccount.setOnClickListener {
+            startActivity(Intent(this, com.example.zuppon.ui.profile.ProfileActivity::class.java))
+        }
         binding.btnChangeRole.setOnClickListener {
             viewModel.cancelOrder()
             startActivity(Intent(this, RoleSelectionActivity::class.java))

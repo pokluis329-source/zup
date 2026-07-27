@@ -30,6 +30,16 @@
             app:layout_constraintBottom_toBottomOf="parent" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_account"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="👤 cuenta" android:textColor="@color/zuppon_accent" android:textSize="12sp"
+            app:layout_constraintEnd_toStartOf="@id/btn_change_role"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginEnd="4dp" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_change_role"
             style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="wrap_content" android:layout_height="wrap_content"

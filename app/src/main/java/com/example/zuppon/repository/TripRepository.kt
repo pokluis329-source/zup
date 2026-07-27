@@ -15,6 +15,7 @@ import com.example.zuppon.model.TripState
 import com.example.zuppon.network.OrderDto
 import com.example.zuppon.util.ActiveOrderStorage
 import com.example.zuppon.util.OrderStorage
+import com.example.zuppon.util.UserSession
 
 enum class DriverStatus { OFFLINE, ONLINE, ACTIVE_TRIP }
 
@@ -127,7 +128,7 @@ object TripRepository {
             items       = request.passengerName,
             destination = request.destination,
             fare        = request.fare,
-            clientName  = buyerName,
+            clientName  = buyerName.ifBlank { UserSession.displayName() },
             destLat     = request.destLat,
             destLng     = request.destLng,
             onSuccess   = { order ->
@@ -344,6 +345,53 @@ object TripRepository {
         _activeOrder.value = null
         com.example.zuppon.network.NetworkRepository.serverOrderId = -1
         currentOrderId = -1L
+    }
+
+    /** Recarga pedido activo e historial del usuario actual (tras login). */
+    fun reloadUserSession() {
+        val ctx = appContext ?: return
+        stopPassengerPolling()
+        _activeOrder.value = null
+        _pendingRequest.value = null
+        _tripState.value = TripState.Idle
+        currentOrderId = -1L
+        com.example.zuppon.network.NetworkRepository.serverOrderId = -1
+
+        val savedHistory = OrderStorage.loadHistory(ctx)
+        _orderHistory.value = savedHistory
+
+        val savedOrder = ActiveOrderStorage.load(ctx)
+        if (savedOrder != null) {
+            restoreActiveOrder(savedOrder)
+            return
+        }
+
+        if (UserSession.isLoggedIn()) {
+            com.example.zuppon.auth.AuthRepository.fetchMyOrders(
+                activeOnly = true,
+                onSuccess = { orders ->
+                    val open = orders.firstOrNull() ?: return@fetchMyOrders
+                    main.post {
+                        if (_activeOrder.value != null) return@post
+                        applyServerOrder(open)
+                        startPassengerPolling()
+                    }
+                },
+                onError = { }
+            )
+        }
+    }
+
+    /** Limpia estado en memoria al cerrar sesión (datos en disco quedan por usuario). */
+    fun logoutUser() {
+        stopPassengerPolling()
+        _activeOrder.value = null
+        _pendingRequest.value = null
+        _tripState.value = TripState.Idle
+        _orderHistory.value = emptyList()
+        _userMessage.value = null
+        currentOrderId = -1L
+        com.example.zuppon.network.NetworkRepository.serverOrderId = -1
     }
 
     // ── Pedido activo del pasajero ────────────────────────────────────────────

@@ -48,12 +48,18 @@ object UserSession {
 
     fun isLoggedIn(): Boolean = !getToken().isNullOrBlank()
 
+    fun isGuest(): Boolean = !isLoggedIn()
+
     fun needsUsername(): Boolean = getUser()?.needs_username == true
+
+    fun userId(): Int? = getUser()?.id?.takeIf { it > 0 }
+
+    fun displayName(): String = getUser()?.displayLabel() ?: "Invitado"
 
     fun clear() {
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             ?.edit()
             ?.clear()
-            ?.apply()
+            ?.commit()
     }
 }

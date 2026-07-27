@@ -8,42 +8,45 @@ import org.json.JSONObject
 
 object OrderStorage {
 
-    private const val PREFS_NAME  = "zuppon_orders"
-    private const val KEY_HISTORY = "order_history"
+    private const val PREFS_NAME = "zuppon_orders"
+
+    private fun historyKey(): String = UserStorageScope.scopedKey("order_history")
 
     fun saveHistory(context: Context, orders: List<OrderRecord>) {
         val arr = JSONArray()
         orders.forEach { r ->
             arr.put(JSONObject().apply {
-                put("id",          r.id)
-                put("items",       r.items)
+                put("id", r.id)
+                put("items", r.items)
                 put("destination", r.destination)
-                put("fare",        r.fare)
-                put("status",      r.status.name)
-                put("timestamp",   r.timestamp)
+                put("fare", r.fare)
+                put("status", r.status.name)
+                put("timestamp", r.timestamp)
             })
         }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_HISTORY, arr.toString()).apply()
+            .edit().putString(historyKey(), arr.toString()).commit()
     }
 
     fun loadHistory(context: Context): List<OrderRecord> {
         val json = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_HISTORY, "[]") ?: "[]"
+            .getString(historyKey(), "[]") ?: "[]"
         return try {
             val arr = JSONArray(json)
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 OrderRecord(
-                    id          = o.getLong("id"),
-                    items       = o.getString("items"),
+                    id = o.getLong("id"),
+                    items = o.getString("items"),
                     destination = o.getString("destination"),
-                    fare        = o.getDouble("fare"),
-                    status      = runCatching { OrderStatus.valueOf(o.getString("status")) }
-                                    .getOrDefault(OrderStatus.PENDING),
-                    timestamp   = o.getLong("timestamp")
+                    fare = o.getDouble("fare"),
+                    status = runCatching { OrderStatus.valueOf(o.getString("status")) }
+                        .getOrDefault(OrderStatus.PENDING),
+                    timestamp = o.getLong("timestamp")
                 )
             }
-        } catch (_: Exception) { emptyList() }
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 }

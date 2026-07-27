@@ -67,6 +67,8 @@ def _ensure_order_columns():
         alters.append("ALTER TABLE orders ADD COLUMN payment_status VARCHAR(24) DEFAULT 'PAID'")
     if "paid_at" not in existing:
         alters.append("ALTER TABLE orders ADD COLUMN paid_at DATETIME")
+    if "user_id" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN user_id INTEGER")
     if not alters:
         return
     with db.engine.begin() as conn:
@@ -108,6 +110,26 @@ def _seed_payment_chat(order: Order):
         body=_payment_welcome_message(order.amount_gs),
     )
     db.session.add(msg)
+
+
+def _client_label(user, fallback: str = "Cliente") -> str:
+    if not user:
+        return fallback
+    if user.username:
+        return f"@{user.username}"
+    if user.display_name:
+        return user.display_name
+    if user.email:
+        return user.email.split("@")[0]
+    return fallback
+
+
+def _can_access_order(order: Order, user_id: int | None) -> bool:
+    if order.user_id is None:
+        return True
+    if user_id is None:
+        return False
+    return order.user_id == user_id
 
 
 app = Flask(__name__)
@@ -196,6 +218,18 @@ def set_username(user):
     return jsonify({"user": user.to_dict()})
 
 
+@app.route("/api/v1/users/me/orders", methods=["GET"])
+@auth.require_auth
+def my_orders(user):
+    """Pedidos del usuario autenticado."""
+    q = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc())
+    if request.args.get("active") == "1":
+        q = q.filter(Order.status.notin_(["COMPLETED", "CANCELLED"]))
+    limit = min(request.args.get("limit", 50, type=int), 100)
+    orders = q.limit(limit).all()
+    return jsonify([o.to_dict() for o in orders])
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  REST — Pedidos
 # ═════════════════════════════════════════════════════════════════════════════
@@ -209,6 +243,9 @@ def get_orders():
 @app.route("/api/orders/<int:order_id>", methods=["GET"])
 def get_order(order_id):
     order = Order.query.get_or_404(order_id)
+    user_id = auth.bearer_user_id()
+    if not _can_access_order(order, user_id):
+        return jsonify({"error": "No autorizado"}), 403
     return jsonify(order.to_dict())
 
 
@@ -220,6 +257,10 @@ def create_order():
     if not all(k in data for k in required):
         return jsonify({"error": f"Faltan campos: {required}"}), 400
 
+    user_id = auth.bearer_user_id()
+    user = db.session.get(User, user_id) if user_id else None
+    client_name = _client_label(user, data.get("client_name", "Cliente"))
+
     amount_gs = payment_config.usd_to_gs(float(data["fare"]))
     order = Order(
         items=data["items"],
@@ -227,7 +268,8 @@ def create_order():
         dest_lat=float(data.get("dest_lat", 0.0) or 0.0),
         dest_lng=float(data.get("dest_lng", 0.0) or 0.0),
         fare=float(data["fare"]),
-        client_name=data.get("client_name", "Cliente"),
+        client_name=client_name,
+        user_id=user.id if user else None,
         amount_gs=amount_gs,
         payment_status="AWAITING_PAYMENT",
         status="PENDING",

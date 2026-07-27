@@ -64,6 +64,12 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Zuppon" />
 
+        <activity
+            android:name=".ui.profile.ProfileActivity"
+            android:exported="false"
+            android:label="Mi cuenta"
+            android:theme="@style/Theme.Zuppon" />
+
         <!-- Menú cliente -->
         <activity
             android:name=".ui.passenger.PassengerActivity"

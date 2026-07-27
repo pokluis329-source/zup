@@ -9,7 +9,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.zuppon.databinding.ActivityRoleSelectionBinding
 import com.example.zuppon.ui.driver.DriverActivity
 import com.example.zuppon.ui.passenger.PassengerActivity
+import com.example.zuppon.ui.profile.ProfileActivity
 import com.example.zuppon.util.AssetImageLoader
+import com.example.zuppon.util.UserSession
 
 class RoleSelectionActivity : AppCompatActivity() {
 
@@ -20,10 +22,8 @@ class RoleSelectionActivity : AppCompatActivity() {
         binding = ActivityRoleSelectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Foto hero real
         AssetImageLoader.load(this, "hero.webp", binding.ivWelcomePhoto)
 
-        // Animación de entrada
         binding.tvSelectRole.alpha    = 0f
         binding.cardPassenger.translationY = 80f
         binding.cardPassenger.alpha   = 0f
@@ -37,14 +37,32 @@ class RoleSelectionActivity : AppCompatActivity() {
             .setDuration(500).setStartDelay(250)
             .setInterpolator(OvershootInterpolator(0.9f)).start()
 
-        // Cliente
         binding.cardPassenger.setOnClickListener {
             startActivity(Intent(this, PassengerActivity::class.java))
         }
 
-        // Conductor
         binding.cardDriver.setOnClickListener {
             startActivity(Intent(this, DriverActivity::class.java))
+        }
+
+        binding.cardProfile.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        bindProfileCard()
+    }
+
+    private fun bindProfileCard() {
+        val user = UserSession.getUser()
+        if (UserSession.isLoggedIn() && user != null) {
+            binding.tvProfileLabel.text = user.displayLabel()
+            binding.tvProfileHint.text = "Mis pedidos · cerrar sesión"
+        } else {
+            binding.tvProfileLabel.text = "Invitado"
+            binding.tvProfileHint.text = "Iniciar sesión · ver cuenta"
         }
     }
 
