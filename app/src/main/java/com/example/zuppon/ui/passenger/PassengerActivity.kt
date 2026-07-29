@@ -42,6 +42,7 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
+import com.example.zuppon.util.NotificationPermission
 import java.util.Locale
 
 class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -86,6 +87,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     private var phraseIndex = 0
     private val phraseHandler = android.os.Handler(Looper.getMainLooper())
     private var showTrackingForActiveOrder = false
+    private lateinit var requestNotifications: () -> Unit
     private val phraseRunnable = object : Runnable {
         override fun run() {
             if (viewModel.tripState.value == TripState.SearchingDriver) {
@@ -165,6 +167,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestNotifications = NotificationPermission.register(this)
         binding = ActivityPassengerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -177,10 +180,12 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
 
         // Pedir permiso GPS automáticamente al entrar
         requestLocationPermission()
+        requestNotifications()
     }
 
     override fun onResume() {
         super.onResume()
+        requestNotifications()
         if (hasLocationPermission()) startLocationTracking()
         if (customLocationSet) restoreCustomMarker()
         viewModel.syncActiveOrder()
@@ -569,6 +574,10 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.btnPickMap.setOnClickListener     { openPickLocation() }
         binding.btnPickMapConfirm.setOnClickListener { openPickLocation() }
 
+        binding.btnTrackingChat.setOnClickListener {
+            viewModel.activeOrder.value?.let { openPaymentChatFromActive(it) }
+        }
+
         binding.btnRequestRide.setOnClickListener {
             val address = binding.etDeliveryAddress.text?.toString()?.trim() ?: ""
             if (address.isBlank()) {
@@ -670,7 +679,12 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
         }
         viewModel.tripState.observe(this) { renderTripState(it) }
-        viewModel.activeOrder.observe(this) { bindActiveOrders(it) }
+        viewModel.activeOrder.observe(this) {
+            bindActiveOrders(it)
+            if (binding.layoutTrackingScreen.visibility == View.VISIBLE) {
+                updateTrackingChatButton()
+            }
+        }
         viewModel.userMessage.observe(this) { msg ->
             if (!msg.isNullOrBlank()) {
                 Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
@@ -760,13 +774,17 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             "📍 ${order.destination} · ${order.formattedAmount()}"
         card.findViewById<TextView>(R.id.tv_active_order_status).text = order.statusLabel()
 
-        val showChat = order.phase == ActiveOrderPhase.AWAITING_PAYMENT ||
-            order.phase == ActiveOrderPhase.PENDING_REVIEW
+        val showChat = order.phase != ActiveOrderPhase.COMPLETED
         val chatBtn = card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_chat)
         val trackBtn = card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_track)
         val cancelBtn = card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_cancel)
 
         chatBtn.visibility = if (showChat) View.VISIBLE else View.GONE
+        chatBtn.text = when (order.phase) {
+            ActiveOrderPhase.AWAITING_PAYMENT,
+            ActiveOrderPhase.PENDING_REVIEW -> "💬 Chat pago"
+            else -> "💬 Chat"
+        }
         chatBtn.setOnClickListener { openPaymentChatFromActive(order) }
 
         trackBtn.text = when (order.phase) {
@@ -798,6 +816,19 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 .putExtra(PaymentChatActivity.EXTRA_ALIAS, order.alias)
                 .putExtra(PaymentChatActivity.EXTRA_CEDULA, order.cedula)
         )
+    }
+
+    private fun updateTrackingChatButton() {
+        val order = viewModel.activeOrder.value
+        val visible = order != null && order.phase != ActiveOrderPhase.COMPLETED
+        binding.btnTrackingChat.visibility = if (visible) View.VISIBLE else View.GONE
+        if (visible && order != null) {
+            binding.btnTrackingChat.text = when (order.phase) {
+                ActiveOrderPhase.AWAITING_PAYMENT,
+                ActiveOrderPhase.PENDING_REVIEW -> "💬 Chat pago"
+                else -> "💬 Chat del pedido"
+            }
+        }
     }
 
     private fun renderTripState(state: TripState) {
@@ -841,6 +872,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun renderTrackingState(state: TripState) {
         showTrackingScreen()
         binding.layoutCompleted.visibility = View.GONE
+        updateTrackingChatButton()
         when (state) {
             is TripState.AwaitingPayment -> {
                 binding.layoutSearching.visibility = View.VISIBLE

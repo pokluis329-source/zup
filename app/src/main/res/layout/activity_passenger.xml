@@ -479,6 +479,15 @@
             android:paddingStart="20dp" android:paddingEnd="20dp"
             android:paddingTop="24dp" android:paddingBottom="28dp">
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_tracking_chat"
+                style="@style/ZupponButtonGreen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:text="💬 Chat del pedido"
+                android:visibility="gone" />
+
             <!-- Info repartidor -->
             <LinearLayout
                 android:id="@+id/card_driver_info"

@@ -1,6 +1,8 @@
 package com.example.zuppon.ui.passenger
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -16,9 +18,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.zuppon.R
+import com.example.zuppon.call.CallUiState
+import com.example.zuppon.call.InAppVoiceCall
+import com.example.zuppon.call.IncomingCallWatcher
+import com.example.zuppon.call.VoiceCallState
 import com.example.zuppon.model.PaymentMessage
 import com.example.zuppon.network.ApiClient
 import com.example.zuppon.network.NetworkRepository
@@ -41,6 +48,23 @@ class PaymentChatActivity : AppCompatActivity() {
     private var contactName: String = ""
     private var contactPhone: String = ""
     private var messageSender: String = "client"
+    private var voiceCall: InAppVoiceCall? = null
+    private var callState: VoiceCallState = VoiceCallState.IDLE
+    private var pendingAcceptAfterMic = false
+
+    private val requestMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+            pendingAcceptAfterMic = false
+            Toast.makeText(this, "Se necesita el micrófono para llamar en la app", Toast.LENGTH_LONG).show()
+            return@registerForActivityResult
+        }
+        if (pendingAcceptAfterMic) {
+            pendingAcceptAfterMic = false
+            voiceCall?.acceptIncoming()
+        } else {
+            voiceCall?.startOutgoing()
+        }
+    }
 
     private val refreshRunnable = object : Runnable {
         override fun run() {
@@ -89,6 +113,7 @@ class PaymentChatActivity : AppCompatActivity() {
         }
 
         setupContactHeader()
+        setupVoiceCall()
 
         val attachBtn = findViewById<View>(R.id.btn_attach_receipt)
         attachBtn.visibility = if (isDriver) View.GONE else View.VISIBLE
@@ -117,24 +142,123 @@ class PaymentChatActivity : AppCompatActivity() {
 
         loadMessages()
         if (isDriver) TripRepository.ensurePolling() else TripRepository.ensurePassengerPolling()
+
+        if (intent.getBooleanExtra(EXTRA_AUTO_ACCEPT, false)) {
+            main.postDelayed({ acceptIncomingCall() }, 350L)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_AUTO_ACCEPT, false)) {
+            acceptIncomingCall()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        CallUiState.setChatOpen(orderId, true)
+        IncomingCallWatcher.dismissNotification(orderId)
+    }
+
+    override fun onStop() {
+        CallUiState.setChatOpen(orderId, false)
+        super.onStop()
+    }
+
+    private fun acceptIncomingCall() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingAcceptAfterMic = true
+            requestMic.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        voiceCall?.acceptIncoming()
     }
 
     private fun setupContactHeader() {
         val nameTv = findViewById<TextView>(R.id.tv_contact_name)
         val phoneTv = findViewById<TextView>(R.id.tv_contact_phone)
         val callBtn = findViewById<View>(R.id.btn_call_contact)
+        val phoneBtn = findViewById<View>(R.id.btn_call_phone)
 
-        if (isDriver && contactName.isNotBlank()) {
-            nameTv.text = "👤 $contactName"
-            nameTv.visibility = View.VISIBLE
-        }
+        val otherLabel = if (isDriver) contactName.ifBlank { "Cliente" } else "Repartidor / soporte"
+        nameTv.text = "👤 $otherLabel"
+        nameTv.visibility = View.VISIBLE
+
+        callBtn.setOnClickListener { beginInAppCall() }
+
         if (isDriver && contactPhone.isNotBlank()) {
             phoneTv.text = "📞 $contactPhone"
             phoneTv.visibility = View.VISIBLE
-            callBtn.visibility = View.VISIBLE
-            callBtn.setOnClickListener { dialPhone(contactPhone) }
+            phoneBtn.visibility = View.VISIBLE
+            phoneBtn.setOnClickListener { dialPhone(contactPhone) }
         } else {
-            callBtn.visibility = View.GONE
+            phoneTv.visibility = View.GONE
+            phoneBtn.visibility = View.GONE
+        }
+    }
+
+    private fun setupVoiceCall() {
+        voiceCall = InAppVoiceCall(this, orderId, messageSender) { state, message ->
+            callState = state
+            updateCallOverlay(state, message)
+        }
+        voiceCall?.startListening()
+
+        findViewById<View>(R.id.btn_accept_call).setOnClickListener {
+            acceptIncomingCall()
+        }
+        findViewById<View>(R.id.btn_reject_call).setOnClickListener {
+            voiceCall?.rejectIncoming()
+        }
+        findViewById<View>(R.id.btn_end_call).setOnClickListener {
+            voiceCall?.hangUp()
+        }
+    }
+
+    private fun beginInAppCall() {
+        pendingAcceptAfterMic = false
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestMic.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        voiceCall?.startOutgoing()
+    }
+
+    private fun updateCallOverlay(state: VoiceCallState, message: String) {
+        val overlay = findViewById<View>(R.id.layout_call_overlay)
+        val statusTv = findViewById<TextView>(R.id.tv_call_status)
+        val incoming = findViewById<View>(R.id.layout_incoming_actions)
+        val endBtn = findViewById<View>(R.id.btn_end_call)
+
+        statusTv.text = message
+        when (state) {
+            VoiceCallState.IDLE, VoiceCallState.ENDED -> {
+                overlay.visibility = View.GONE
+                incoming.visibility = View.GONE
+                endBtn.visibility = View.GONE
+            }
+            VoiceCallState.INCOMING -> {
+                overlay.visibility = View.VISIBLE
+                incoming.visibility = View.VISIBLE
+                endBtn.visibility = View.GONE
+            }
+            VoiceCallState.CALLING, VoiceCallState.CONNECTING, VoiceCallState.CONNECTED -> {
+                overlay.visibility = View.VISIBLE
+                incoming.visibility = View.GONE
+                endBtn.visibility = View.VISIBLE
+            }
+            VoiceCallState.FAILED -> {
+                overlay.visibility = View.VISIBLE
+                incoming.visibility = View.GONE
+                endBtn.visibility = View.VISIBLE
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -155,6 +279,11 @@ class PaymentChatActivity : AppCompatActivity() {
     override fun onPause() {
         main.removeCallbacks(refreshRunnable)
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        voiceCall?.release()
+        super.onDestroy()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -245,6 +374,7 @@ class PaymentChatActivity : AppCompatActivity() {
         const val EXTRA_IS_DRIVER = "is_driver"
         const val EXTRA_CONTACT_NAME = "contact_name"
         const val EXTRA_CONTACT_PHONE = "contact_phone"
+        const val EXTRA_AUTO_ACCEPT = "auto_accept"
     }
 }
 

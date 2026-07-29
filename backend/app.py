@@ -604,6 +604,54 @@ def on_join_order(data):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  Llamadas de voz in-app (señalización WebRTC)
+# ═════════════════════════════════════════════════════════════════════════════
+
+_call_signals: dict[int, list] = {}
+
+
+def _prune_call_signals(order_id: int, max_items: int = 80):
+    bucket = _call_signals.get(order_id)
+    if bucket and len(bucket) > max_items:
+        _call_signals[order_id] = bucket[-max_items:]
+
+
+@app.route("/api/v1/orders/<int:order_id>/call/signal", methods=["POST"])
+def post_call_signal(order_id):
+    """Recibe offer/answer/ice/ring/hangup y lo guarda para el otro participante."""
+    data = request.get_json() or {}
+    signal_type = (data.get("type") or "").strip()
+    sender = (data.get("from") or "").strip()
+    if signal_type not in ("ring", "offer", "answer", "ice", "hangup", "reject"):
+        return jsonify({"error": "type inválido"}), 400
+    if sender not in ("client", "driver"):
+        return jsonify({"error": "from inválido"}), 400
+
+    payload = {
+        "id": str(uuid.uuid4()),
+        "ts": datetime.utcnow().timestamp(),
+        "type": signal_type,
+        "from": sender,
+        "sdp": data.get("sdp"),
+        "candidate": data.get("candidate"),
+        "sdp_mid": data.get("sdp_mid"),
+        "sdp_mline_index": data.get("sdp_mline_index"),
+    }
+    _call_signals.setdefault(order_id, []).append(payload)
+    _prune_call_signals(order_id)
+    return jsonify({"ok": True, "id": payload["id"], "ts": payload["ts"]})
+
+
+@app.route("/api/v1/orders/<int:order_id>/call/signal", methods=["GET"])
+def get_call_signals(order_id):
+    """Polling de señales WebRTC desde `since` (timestamp unix)."""
+    since = request.args.get("since", 0, type=float)
+    bucket = _call_signals.get(order_id, [])
+    out = [s for s in bucket if s.get("ts", 0) > since]
+    return jsonify(out)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  Health / Dashboard / Menú
 # ═════════════════════════════════════════════════════════════════════════════
 

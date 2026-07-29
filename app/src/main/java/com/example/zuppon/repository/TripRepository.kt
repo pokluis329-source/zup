@@ -16,6 +16,8 @@ import com.example.zuppon.network.OrderDto
 import com.example.zuppon.util.ActiveOrderStorage
 import com.example.zuppon.util.OrderStorage
 import com.example.zuppon.util.UserSession
+import com.example.zuppon.call.IncomingCallWatchContext
+import com.example.zuppon.call.IncomingCallWatcher
 
 enum class DriverStatus { OFFLINE, ONLINE, ACTIVE_TRIP }
 
@@ -60,6 +62,7 @@ object TripRepository {
         applyTripStateFromPhase(order.phase, order.driverName, order.driverVehicle)
         startPassengerPolling()
         syncActiveOrderFromServer()
+        syncCallWatcher()
     }
 
     // ── Trip state ────────────────────────────────────────────────────────────
@@ -282,6 +285,7 @@ object TripRepository {
             myCourierInfo.name,
             myCourierInfo.carModel
         )
+        syncCallWatcher()
     }
 
     fun driverAcceptTrip() {
@@ -332,6 +336,7 @@ object TripRepository {
         _pendingRequest.value = null
         currentOrderId       = -1L
         com.example.zuppon.network.NetworkRepository.serverOrderId = -1
+        IncomingCallWatcher.stop()
         startPolling()  // volver a buscar pedidos
     }
 
@@ -342,6 +347,7 @@ object TripRepository {
 
     fun clearActiveOrder() {
         stopPassengerPolling()
+        IncomingCallWatcher.stop()
         appContext?.let { ActiveOrderStorage.clear(it) }
         _activeOrder.value = null
         com.example.zuppon.network.NetworkRepository.serverOrderId = -1
@@ -386,6 +392,7 @@ object TripRepository {
     /** Limpia estado en memoria al cerrar sesión (datos en disco quedan por usuario). */
     fun logoutUser() {
         stopPassengerPolling()
+        IncomingCallWatcher.stop()
         _activeOrder.value = null
         _pendingRequest.value = null
         _tripState.value = TripState.Idle
@@ -400,6 +407,7 @@ object TripRepository {
     private fun saveActiveOrder(order: ActiveOrder) {
         _activeOrder.value = order
         appContext?.let { ActiveOrderStorage.save(it, order) }
+        syncCallWatcher()
     }
 
     private fun updateActiveOrderPhase(phase: ActiveOrderPhase) {
@@ -682,5 +690,41 @@ object TripRepository {
                 android.util.Log.e("ZUPPON_REPO", "❌ Error fetching orders: $it")
             }
         )
+    }
+
+    private fun syncCallWatcher() {
+        val order = _activeOrder.value
+        if (order != null && order.phase != ActiveOrderPhase.COMPLETED) {
+            IncomingCallWatcher.watch(
+                IncomingCallWatchContext(
+                    orderId = order.serverOrderId,
+                    role = "client",
+                    isDriver = false,
+                    amountGs = order.amountGs,
+                    alias = order.alias,
+                    cedula = order.cedula
+                )
+            )
+            return
+        }
+
+        if (_driverStatus.value == DriverStatus.ACTIVE_TRIP) {
+            val serverId = com.example.zuppon.network.NetworkRepository.serverOrderId
+            val req = _pendingRequest.value
+            if (serverId != -1) {
+                IncomingCallWatcher.watch(
+                    IncomingCallWatchContext(
+                        orderId = serverId,
+                        role = "driver",
+                        isDriver = true,
+                        contactName = req?.clientName.orEmpty(),
+                        contactPhone = req?.clientPhone.orEmpty()
+                    )
+                )
+                return
+            }
+        }
+
+        IncomingCallWatcher.stop()
     }
 }

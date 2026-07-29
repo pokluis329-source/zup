@@ -61,4 +61,11 @@
     <string name="change_role">Cambiar rol</string>
     <string name="min">min</string>
     <string name="currency_symbol">$</string>
+
+    <string name="call_notification_channel">Llamadas Zuppon</string>
+    <string name="call_notification_channel_desc">Avisos de llamadas entrantes del pedido</string>
+    <string name="incoming_call_title">📞 Llamada entrante</string>
+    <string name="incoming_call_body">%1$s · pedido #%2$d</string>
+    <string name="call_action_accept">Contestar</string>
+    <string name="call_action_reject">Rechazar</string>
 </resources>

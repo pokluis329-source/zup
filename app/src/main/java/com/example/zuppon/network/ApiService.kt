@@ -78,6 +78,32 @@ data class PaymentMessageDto(
 
 data class SendMessageRequest(val body: String, val sender: String = "client")
 
+data class CallSignalRequest(
+    val type: String,
+    val from: String,
+    val sdp: String? = null,
+    val candidate: String? = null,
+    val sdp_mid: String? = null,
+    val sdp_mline_index: Int? = null
+)
+
+data class CallSignalDto(
+    val id: String = "",
+    val ts: Double = 0.0,
+    val type: String = "",
+    val from: String = "",
+    val sdp: String? = null,
+    val candidate: String? = null,
+    val sdp_mid: String? = null,
+    val sdp_mline_index: Int? = null
+)
+
+data class CallSignalResponse(
+    val ok: Boolean = false,
+    val id: String? = null,
+    val ts: Double? = null
+)
+
 data class AcceptOrderRequest(
     val driver_id: Int,
     val driver_name: String,
@@ -196,6 +222,18 @@ interface ApiService {
 
     @POST("api/orders/{id}/cancel")
     fun cancelOrder(@Path("id") id: Int): Call<OrderDto>
+
+    @POST("api/v1/orders/{id}/call/signal")
+    fun sendCallSignal(
+        @Path("id") id: Int,
+        @Body body: CallSignalRequest
+    ): Call<CallSignalResponse>
+
+    @GET("api/v1/orders/{id}/call/signal")
+    fun getCallSignals(
+        @Path("id") id: Int,
+        @Query("since") since: Double
+    ): Call<List<CallSignalDto>>
 
     @GET("api/drivers")
     fun getDrivers(): Call<List<DriverDto>>

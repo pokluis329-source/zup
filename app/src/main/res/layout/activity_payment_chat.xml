@@ -1,167 +1,252 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/zuppon_primary">
 
     <LinearLayout
-        android:id="@+id/layout_chat_header"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="14dp"
-        android:background="@color/zuppon_surface">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/layout_chat_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:background="@color/zuppon_surface">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_chat_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Chat del pedido"
+                        android:textColor="@color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_contact_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tv_contact_phone"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/zuppon_text_secondary"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="end">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_call_contact"
+                        style="@style/ZupponButtonGreen"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="📞 Llamar en app" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_call_phone"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Teléfono celular"
+                        android:textColor="@color/zuppon_text_secondary"
+                        android:textSize="11sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layout_payment_info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="10dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Transferencia bancaria"
+                    android:textColor="@color/zuppon_text_secondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_payment_amount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/zuppon_yellow"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:text="Gs —" />
+
+                <TextView
+                    android:id="@+id/tv_payment_alias"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/zuppon_text_secondary"
+                    android:textSize="14sp"
+                    android:text="Alias: —" />
+
+                <TextView
+                    android:id="@+id/tv_payment_cedula"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="@color/zuppon_text_secondary"
+                    android:textSize="14sp"
+                    android:text="CI: —" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_payment_chat"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="12dp"
+            android:clipToPadding="false" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:padding="10dp"
+            android:gravity="center_vertical"
+            android:background="@color/zuppon_surface">
 
-            <LinearLayout
+            <ImageButton
+                android:id="@+id/btn_attach_receipt"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_accent_pill"
+                android:contentDescription="Enviar comprobante"
+                android:src="@android:drawable/ic_menu_camera"
+                android:padding="10dp"
+                app:tint="@color/white" />
+
+            <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:boxBackgroundColor="@color/zuppon_card"
+                app:boxStrokeColor="@color/zuppon_accent">
 
-                <TextView
-                    android:id="@+id/tv_chat_title"
-                    android:layout_width="wrap_content"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_chat_message"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Chat del pedido"
+                    android:hint="Mensaje opcional…"
                     android:textColor="@color/white"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:maxLines="3" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-                <TextView
-                    android:id="@+id/tv_contact_name"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/tv_contact_phone"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/zuppon_text_secondary"
-                    android:textSize="13sp"
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_call_contact"
-                style="@style/ZupponButtonGreen"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📞 Llamar"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/layout_payment_info"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="10dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Transferencia bancaria"
-                android:textColor="@color/zuppon_text_secondary"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/tv_payment_amount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/zuppon_yellow"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:text="Gs —" />
-
-            <TextView
-                android:id="@+id/tv_payment_alias"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/zuppon_text_secondary"
-                android:textSize="14sp"
-                android:text="Alias: —" />
-
-            <TextView
-                android:id="@+id/tv_payment_cedula"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textColor="@color/zuppon_text_secondary"
-                android:textSize="14sp"
-                android:text="CI: —" />
+            <ImageButton
+                android:id="@+id/btn_send_message"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_accent_pill"
+                android:contentDescription="Enviar"
+                android:src="@android:drawable/ic_menu_send"
+                android:padding="10dp"
+                app:tint="@color/white" />
         </LinearLayout>
     </LinearLayout>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_payment_chat"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="12dp"
-        android:clipToPadding="false" />
 
     <LinearLayout
+        android:id="@+id/layout_call_overlay"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="10dp"
-        android:gravity="center_vertical"
-        android:background="@color/zuppon_surface">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="28dp"
+        android:background="#E6000000"
+        android:visibility="gone">
 
-        <ImageButton
-            android:id="@+id/btn_attach_receipt"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_accent_pill"
-            android:contentDescription="Enviar comprobante"
-            android:src="@android:drawable/ic_menu_camera"
-            android:padding="10dp"
-            app:tint="@color/white" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="0dp"
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            app:boxBackgroundColor="@color/zuppon_card"
-            app:boxStrokeColor="@color/zuppon_accent">
+            android:text="🎙️"
+            android:textSize="56sp"
+            android:layout_marginBottom="16dp" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_chat_message"
-                android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/tv_call_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Llamando…"
+            android:textColor="@color/white"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="24dp" />
+
+        <LinearLayout
+            android:id="@+id/layout_incoming_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_reject_call"
+                style="@style/ZupponButtonOutline"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:hint="Mensaje opcional…"
-                android:textColor="@color/white"
-                android:inputType="textCapSentences|textMultiLine"
-                android:maxLines="3" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Rechazar" />
 
-        <ImageButton
-            android:id="@+id/btn_send_message"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_accent_pill"
-            android:contentDescription="Enviar"
-            android:src="@android:drawable/ic_menu_send"
-            android:padding="10dp"
-            app:tint="@color/white" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_accept_call"
+                style="@style/ZupponButtonGreen"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Contestar" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_end_call"
+            style="@style/ZupponButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Colgar"
+            android:visibility="gone" />
     </LinearLayout>
 
-</LinearLayout>
+</FrameLayout>

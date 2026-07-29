@@ -3,6 +3,7 @@ package com.example.zuppon
 import android.app.Application
 import com.example.zuppon.network.ApiClient
 import com.example.zuppon.repository.TripRepository
+import com.example.zuppon.call.IncomingCallWatcher
 import com.example.zuppon.util.UserSession
 
 class ZupponApp : Application() {
@@ -11,5 +12,6 @@ class ZupponApp : Application() {
         UserSession.init(this)
         ApiClient.authTokenProvider = { UserSession.getToken() }
         TripRepository.init(this)
+        IncomingCallWatcher.init(this)
     }
 }

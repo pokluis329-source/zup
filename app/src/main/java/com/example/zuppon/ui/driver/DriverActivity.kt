@@ -42,6 +42,7 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
 import com.example.zuppon.auth.AuthRepository
+import com.example.zuppon.util.NotificationPermission
 import com.example.zuppon.util.UserSession
 import com.google.android.material.bottomsheet.BottomSheetDialog
 
@@ -67,9 +68,11 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
     private var pendingCameraFitDone = false
     private var orderSheet: BottomSheetDialog? = null
     private var previousDriverStatus: DriverStatus? = null
+    private lateinit var requestNotifications: () -> Unit
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestNotifications = NotificationPermission.register(this)
 
         if (!UserSession.canDrive()) {
             Toast.makeText(
@@ -89,6 +92,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         initMap()
         setupListeners()
         observeViewModel()
+        requestNotifications()
     }
 
     // ── Listeners ─────────────────────────────────────────────────────────────
@@ -110,9 +114,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             viewModel.advanceTripStep()
         }
         binding.btnActiveChat.setOnClickListener { openClientChat() }
-        binding.btnActiveCall.setOnClickListener {
-            TripRepository.pendingRequest.value?.clientPhone?.let { dialPhone(it) }
-        }
+        binding.btnActiveCall.setOnClickListener { openClientChat() }
     }
 
     private fun openClientChat() {
@@ -146,13 +148,12 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         val name = req.clientName.ifBlank { "Cliente" }
         binding.tvActiveClientName.text = "👤 $name"
         binding.tvActiveClientName.visibility = View.VISIBLE
+        binding.btnActiveCall.visibility = View.VISIBLE
         if (req.clientPhone.isNotBlank()) {
             binding.tvActiveClientPhone.text = "📞 ${req.clientPhone}"
             binding.tvActiveClientPhone.visibility = View.VISIBLE
-            binding.btnActiveCall.visibility = View.VISIBLE
         } else {
             binding.tvActiveClientPhone.visibility = View.GONE
-            binding.btnActiveCall.visibility = View.GONE
         }
     }
 
@@ -473,6 +474,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
+        requestNotifications()
         if (!UserSession.canDrive()) {
             denyDriverAccess()
             return
