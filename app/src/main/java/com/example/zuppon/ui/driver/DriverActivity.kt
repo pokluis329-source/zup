@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Looper
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -40,9 +41,9 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
-import android.widget.Toast
 import com.example.zuppon.auth.AuthRepository
 import com.example.zuppon.util.UserSession
+import com.google.android.material.bottomsheet.BottomSheetDialog
 
 class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
