@@ -25,6 +25,7 @@ import com.example.zuppon.databinding.ActivityPassengerBinding
 import com.example.zuppon.model.ActiveOrder
 import com.example.zuppon.model.ActiveOrderPhase
 import com.example.zuppon.model.FoodMenu
+import com.example.zuppon.model.TripState
 import com.example.zuppon.util.UserSession
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
