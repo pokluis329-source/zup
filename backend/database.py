@@ -180,6 +180,12 @@ class User(db.Model):
             "needs_username": self.username is None,
         }
 
+    def to_admin_dict(self, orders_count: int = 0):
+        data = self.to_dict()
+        data["created_at"] = self.created_at.isoformat() if self.created_at else None
+        data["orders_count"] = orders_count
+        return data
+
     orders = db.relationship(
         "Order",
         backref="owner",

@@ -211,6 +211,67 @@
       color: #fff;
       border-color: #2196F3;
     }
+
+    /* ── Tabs ── */
+    .page-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 0 28px 16px;
+      flex-wrap: wrap;
+    }
+    .page-tab {
+      background: #1f1f1f;
+      border: 1px solid #333;
+      color: #aaa;
+      padding: 8px 18px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all .15s;
+    }
+    .page-tab.active, .page-tab:hover {
+      background: #2196F3;
+      color: #fff;
+      border-color: #2196F3;
+    }
+
+    /* ── Users table ── */
+    .users-wrap {
+      padding: 0 28px 40px;
+    }
+    .users-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1f1f1f;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #2a2a2a;
+    }
+    .users-table th,
+    .users-table td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid #2a2a2a;
+      font-size: 13px;
+    }
+    .users-table th {
+      background: #141414;
+      color: #777;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .users-table tr:last-child td { border-bottom: none; }
+    .users-table tr:hover td { background: #252525; }
+    .user-username { color: #00D4FF; font-weight: 700; }
+    .user-pending { color: #FFD54F; font-size: 11px; }
+    .users-summary {
+      padding: 0 28px 12px;
+      font-size: 13px;
+      color: #888;
+    }
+    .panel-hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -221,11 +282,17 @@
   <div class="dot-live" title="Actualizando en tiempo real"></div>
   <div id="last-update" style="font-size:11px;color:#555;margin-left:8px"></div>
   <a href="/menu" style="margin-left:auto;background:#1f1f1f;border:1px solid #333;color:#aaa;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;text-decoration:none;transition:all .15s" onmouseover="this.style.background='#2196F3';this.style.color='#fff'" onmouseout="this.style.background='#1f1f1f';this.style.color='#aaa'">🍔 Editor de Menú</a>
-  <button class="refresh-btn" onclick="loadOrders()">↻ Actualizar</button>
+  <button class="refresh-btn" onclick="refreshCurrentPanel()">↻ Actualizar</button>
+</div>
+
+<!-- Tabs -->
+<div class="page-tabs">
+  <button class="page-tab active" id="tab-orders" onclick="showPanel('orders', this)">📦 Pedidos</button>
+  <button class="page-tab" id="tab-users" onclick="showPanel('users', this)">👤 Usuarios</button>
 </div>
 
 <!-- Stats -->
-<div class="stats">
+<div class="stats" id="panel-stats">
   <div class="stat-card">
     <div class="val" id="stat-total">—</div>
     <div class="lbl">Total pedidos</div>
@@ -242,9 +309,14 @@
     <div class="val" style="color:#00D4FF" id="stat-revenue">—</div>
     <div class="lbl">Ingresos (Gs)</div>
   </div>
+  <div class="stat-card">
+    <div class="val" style="color:#AB47BC" id="stat-users">—</div>
+    <div class="lbl">Usuarios totales</div>
+  </div>
 </div>
 
-<!-- Filtros -->
+<!-- Panel pedidos -->
+<div id="orders-panel">
 <div class="filters">
   <button class="filter-btn active" onclick="filterOrders('ALL', this)">Todos</button>
   <button class="filter-btn" onclick="filterOrders('PENDING', this)">🔍 Pendiente</button>
@@ -258,10 +330,36 @@
 <div class="orders-grid" id="orders-container">
   <div class="empty"><div class="emoji">🛵</div>Cargando pedidos…</div>
 </div>
+</div>
+
+<!-- Panel usuarios -->
+<div id="users-panel" class="panel-hidden">
+  <div class="users-summary" id="users-summary">Cargando usuarios…</div>
+  <div class="users-wrap">
+    <table class="users-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Nombre</th>
+          <th>Email</th>
+          <th>Pedidos</th>
+          <th>Registro</th>
+        </tr>
+      </thead>
+      <tbody id="users-tbody">
+        <tr><td colspan="6" style="text-align:center;color:#555;padding:32px">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
 <script>
   let allOrders = [];
+  let allUsers = [];
+  let usersTotal = 0;
   let currentFilter = 'ALL';
+  let currentPanel = 'orders';
 
   const PAYMENT_LABELS = {
     AWAITING_PAYMENT: '💸 Esperando transferencia',
@@ -338,6 +436,70 @@
     renderOrders(filtered);
   }
 
+  function showPanel(panel, btn) {
+    currentPanel = panel;
+    document.querySelectorAll('.page-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('orders-panel').classList.toggle('panel-hidden', panel !== 'orders');
+    document.getElementById('users-panel').classList.toggle('panel-hidden', panel !== 'users');
+    if (panel === 'users') loadUsers();
+  }
+
+  function refreshCurrentPanel() {
+    loadOrders();
+    loadUsers();
+    document.getElementById('last-update').textContent =
+      'actualizado ' + new Date().toLocaleTimeString('es-PY');
+  }
+
+  function renderUsers() {
+    const tbody = document.getElementById('users-tbody');
+    const summary = document.getElementById('users-summary');
+    document.getElementById('stat-users').textContent = usersTotal;
+
+    summary.textContent = `${usersTotal} usuario${usersTotal !== 1 ? 's' : ''} registrado${usersTotal !== 1 ? 's' : ''}`;
+
+    if (!allUsers.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#555;padding:32px">Sin usuarios todavía</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = allUsers.map(u => `
+      <tr>
+        <td>#${u.id}</td>
+        <td>${u.username
+          ? `<span class="user-username">@${esc(u.username)}</span>`
+          : `<span class="user-pending">sin username</span>`}
+        </td>
+        <td>${esc(u.display_name || '—')}</td>
+        <td>${esc(u.email || '—')}</td>
+        <td>${u.orders_count || 0}</td>
+        <td>${formatTime(u.created_at)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function esc(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
+  async function loadUsers() {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      allUsers = data.users || [];
+      usersTotal = data.total || allUsers.length;
+      renderUsers();
+    } catch (e) {
+      document.getElementById('users-tbody').innerHTML =
+        `<tr><td colspan="6" style="text-align:center;color:#EF5350;padding:32px">Error: ${esc(e.message)}</td></tr>`;
+      document.getElementById('users-summary').textContent = 'No se pudieron cargar los usuarios';
+    }
+  }
+
   function updateStats(orders) {
     document.getElementById('stat-total').textContent = orders.length;
     document.getElementById('stat-pending').textContent =
@@ -402,7 +564,8 @@
 
   // Cargar al inicio y actualizar cada 5 segundos
   loadOrders();
-  setInterval(loadOrders, 5000);
+  loadUsers();
+  setInterval(refreshCurrentPanel, 5000);
 </script>
 </body>
 </html>

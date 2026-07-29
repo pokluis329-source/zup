@@ -13,7 +13,7 @@ from datetime import datetime
 
 from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, text, func
 
 from database import db, Order, Driver, MenuItem, PaymentMessage, User, MENU_SEED
 import payment_config
@@ -228,6 +228,23 @@ def my_orders(user):
     limit = min(request.args.get("limit", 50, type=int), 100)
     orders = q.limit(limit).all()
     return jsonify([o.to_dict() for o in orders])
+
+
+@app.route("/api/admin/users", methods=["GET"])
+def admin_users():
+    """Lista usuarios registrados (dashboard admin)."""
+    order_counts = dict(
+        db.session.query(Order.user_id, func.count(Order.id))
+        .filter(Order.user_id.isnot(None))
+        .group_by(Order.user_id)
+        .all()
+    )
+    users = User.query.order_by(User.created_at.desc()).all()
+    payload = [
+        u.to_admin_dict(orders_count=order_counts.get(u.id, 0))
+        for u in users
+    ]
+    return jsonify({"total": len(users), "users": payload})
 
 
 # ═════════════════════════════════════════════════════════════════════════════
