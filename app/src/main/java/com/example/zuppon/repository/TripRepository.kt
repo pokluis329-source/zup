@@ -129,6 +129,7 @@ object TripRepository {
             destination = request.destination,
             fare        = request.fare,
             clientName  = buyerName.ifBlank { UserSession.displayName() },
+            clientPhone = buyerPhone,
             destLat     = request.destLat,
             destLng     = request.destLng,
             onSuccess   = { order ->
@@ -651,16 +652,18 @@ object TripRepository {
                 pendingOrderMap.keys.retainAll(activeIds)
 
                 pendingDtos.forEach { dto ->
-                    // Solo agregar si no estaba ya (evitar sobrescribir innecesariamente)
-                    if (!pendingOrderMap.containsKey(dto.id)) {
-                        pendingOrderMap[dto.id] = TripRequest(
-                            passengerName = dto.items.ifBlank { dto.client_name },
-                            destination   = dto.destination,
-                            fare          = dto.fare,
-                            destLat       = dto.dest_lat,
-                            destLng       = dto.dest_lng
-                        )
-                        // Agregar al historial para el driver
+                    val phone = dto.client_phone.ifBlank { dto.buyer?.phone.orEmpty() }
+                    val wasNew = !pendingOrderMap.containsKey(dto.id)
+                    pendingOrderMap[dto.id] = TripRequest(
+                        passengerName = dto.items.ifBlank { dto.client_name },
+                        destination   = dto.destination,
+                        fare          = dto.fare,
+                        destLat       = dto.dest_lat,
+                        destLng       = dto.dest_lng,
+                        clientName    = dto.client_name,
+                        clientPhone   = phone
+                    )
+                    if (wasNew) {
                         addOrUpdateHistory(OrderRecord(
                             id          = dto.id.toLong(),
                             items       = dto.items.ifBlank { dto.client_name },

@@ -266,12 +266,92 @@
     .users-table tr:hover td { background: #252525; }
     .user-username { color: #00D4FF; font-weight: 700; }
     .user-pending { color: #FFD54F; font-size: 11px; }
+    .driver-badge-user {
+      display: inline-block;
+      background: #0a2a1a;
+      color: #66BB6A;
+      border: 1px solid #1b5e20;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .driver-toggle-btn {
+      border: 1px solid #333;
+      background: #252525;
+      color: #aaa;
+      padding: 7px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all .15s;
+    }
+    .driver-toggle-btn:hover { background: #333; color: #fff; }
+    .driver-toggle-btn.active {
+      background: #0a2a1a;
+      color: #66BB6A;
+      border-color: #1b5e20;
+    }
+    .driver-toggle-btn.revoke:hover {
+      background: #3a1515;
+      color: #ff8a80;
+      border-color: #b71c1c;
+    }
     .users-summary {
       padding: 0 28px 12px;
       font-size: 13px;
       color: #888;
     }
     .panel-hidden { display: none !important; }
+
+    .buyer-box {
+      background: #141414;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #bbb;
+    }
+    .buyer-box strong { color: #fff; }
+    .buyer-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .call-btn, .chat-toggle-btn {
+      background: #0a2a1a;
+      color: #66BB6A;
+      border: 1px solid #1b5e20;
+      padding: 6px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .chat-toggle-btn {
+      background: #1a2a3a;
+      color: #29B6F6;
+      border-color: #1565c0;
+    }
+    .chat-preview {
+      background: #111;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+    .chat-preview.hidden { display: none; }
+    .chat-msg { margin-bottom: 8px; padding: 6px 8px; border-radius: 8px; }
+    .chat-client { background: #1a2a3a; color: #ddd; }
+    .chat-admin, .chat-driver { background: #0a2a1a; color: #ddd; }
+    .chat-system { background: #222; color: #999; font-style: italic; }
   </style>
 </head>
 <body>
@@ -344,11 +424,12 @@
           <th>Nombre</th>
           <th>Email</th>
           <th>Pedidos</th>
+          <th>Conductor</th>
           <th>Registro</th>
         </tr>
       </thead>
       <tbody id="users-tbody">
-        <tr><td colspan="6" style="text-align:center;color:#555;padding:32px">Cargando…</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:#555;padding:32px">Cargando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -388,6 +469,13 @@
     return d.toLocaleString('es-PY', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
   }
 
+  function buyerLabel(o) {
+    const b = o.buyer || {};
+    if (b.username) return '@' + b.username;
+    if (b.display_name) return b.display_name;
+    return o.client_name || 'Cliente';
+  }
+
   function renderOrders(orders) {
     const container = document.getElementById('orders-container');
     const count = document.getElementById('orders-count');
@@ -400,21 +488,41 @@
 
     count.textContent = `${orders.length} pedido${orders.length !== 1 ? 's' : ''}`;
 
-    container.innerHTML = orders.map(o => `
+    container.innerHTML = orders.map(o => {
+      const b = o.buyer || {};
+      const phone = (o.client_phone || b.phone || '').trim();
+      const phoneHtml = phone
+        ? `<div>📞 <a href="tel:${phone.replace(/\s/g,'')}" style="color:#66BB6A;text-decoration:none">${esc(phone)}</a></div>`
+        : '<div>📞 <span style="color:#666">Sin teléfono</span></div>';
+      return `
       <div class="order-card">
         <div class="order-header">
           <div>
             <div style="font-size:11px;color:#555">Pedido #${o.id}</div>
-            <div style="font-size:11px;color:#777;margin-top:2px">${o.client_name}</div>
+            <div style="font-size:13px;color:#fff;margin-top:4px;font-weight:700">${esc(buyerLabel(o))}</div>
           </div>
           <span class="status-pill status-${o.status}">${STATUS_LABELS[o.status] || o.status}</span>
         </div>
 
-        <div class="order-items">🍔 ${o.items}</div>
-        <div class="order-dest">📍 <span>${o.destination}</span></div>
+        <div class="buyer-box">
+          <div><strong>👤 Cliente:</strong> ${esc(o.client_name || buyerLabel(o))}</div>
+          ${b.username ? `<div><strong>@</strong> ${esc(b.username)}</div>` : ''}
+          ${b.email ? `<div>✉️ ${esc(b.email)}</div>` : ''}
+          ${phoneHtml}
+          ${b.user_id ? `<div style="color:#555;margin-top:4px">Usuario #${b.user_id}</div>` : ''}
+          <div class="buyer-actions">
+            ${phone ? `<a class="call-btn" href="tel:${phone.replace(/\s/g,'')}">📞 Llamar cliente</a>` : ''}
+            <button class="chat-toggle-btn" onclick="toggleChat(${o.id}, event)">💬 Ver chat</button>
+          </div>
+        </div>
+
+        <div id="chat-${o.id}" class="chat-preview hidden"></div>
+
+        <div class="order-items">🍔 ${esc(o.items)}</div>
+        <div class="order-dest">📍 <span>${esc(o.destination)}</span></div>
         <span class="payment-pill pay-${o.payment_status || 'AWAITING_PAYMENT'}">${PAYMENT_LABELS[o.payment_status] || o.payment_status}</span>
 
-        ${o.driver_name ? `<div class="driver-badge">🛵 ${o.driver_name} · ${o.driver_vehicle || ''}</div>` : ''}
+        ${o.driver_name ? `<div class="driver-badge">🛵 ${esc(o.driver_name)} · ${esc(o.driver_vehicle || '')}</div>` : ''}
 
         <div class="order-footer">
           <div class="fare">${formatGs(o.fare)}</div>
@@ -424,8 +532,41 @@
             <button class="delete-btn" onclick="deleteOrder(${o.id}, event)" title="Eliminar pedido">🗑 Eliminar</button>
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
+  }
+
+  async function toggleChat(orderId, event) {
+    event.stopPropagation();
+    const box = document.getElementById('chat-' + orderId);
+    if (!box) return;
+    if (!box.classList.contains('hidden')) {
+      box.classList.add('hidden');
+      return;
+    }
+    box.classList.remove('hidden');
+    box.innerHTML = 'Cargando chat…';
+    try {
+      const res = await fetch('/api/orders/' + orderId + '/messages');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const msgs = await res.json();
+      if (!msgs.length) {
+        box.innerHTML = '<div style="color:#666">Sin mensajes todavía</div>';
+        return;
+      }
+      box.innerHTML = msgs.map(m => {
+        const cls = m.sender === 'client' ? 'chat-client'
+          : (m.sender === 'driver' ? 'chat-driver' : (m.sender === 'system' ? 'chat-system' : 'chat-admin'));
+        const who = m.sender === 'client' ? 'Cliente'
+          : (m.sender === 'driver' ? 'Repartidor' : (m.sender === 'system' ? 'Sistema' : 'Admin'));
+        const body = m.type === 'image'
+          ? `<a href="${m.image_url || '#'}" target="_blank" style="color:#29B6F6">📸 Ver comprobante</a>`
+          : esc(m.body || '');
+        return `<div class="chat-msg ${cls}"><strong>${who}:</strong> ${body}</div>`;
+      }).join('');
+    } catch (e) {
+      box.innerHTML = `<div style="color:#EF5350">Error: ${esc(e.message)}</div>`;
+    }
   }
 
   function filterOrders(status, btn) {
@@ -460,9 +601,12 @@
     summary.textContent = `${usersTotal} usuario${usersTotal !== 1 ? 's' : ''} registrado${usersTotal !== 1 ? 's' : ''}`;
 
     if (!allUsers.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#555;padding:32px">Sin usuarios todavía</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#555;padding:32px">Sin usuarios todavía</td></tr>';
       return;
     }
+
+    const driversCount = allUsers.filter(u => u.is_driver).length;
+    summary.textContent = `${usersTotal} usuario${usersTotal !== 1 ? 's' : ''} registrado${usersTotal !== 1 ? 's' : ''} · ${driversCount} repartidor${driversCount !== 1 ? 'es' : ''}`;
 
     tbody.innerHTML = allUsers.map(u => `
       <tr>
@@ -474,9 +618,37 @@
         <td>${esc(u.display_name || '—')}</td>
         <td>${esc(u.email || '—')}</td>
         <td>${u.orders_count || 0}</td>
+        <td>
+          ${u.is_driver
+            ? `<span class="driver-badge-user">🛵 Repartidor</span><br>`
+            : ''}
+          <button
+            class="driver-toggle-btn ${u.is_driver ? 'active revoke' : ''}"
+            onclick="toggleDriver(${u.id}, ${u.is_driver ? 'false' : 'true'}, this)">
+            ${u.is_driver ? 'Quitar acceso' : '🛵 Designar repartidor'}
+          </button>
+        </td>
         <td>${formatTime(u.created_at)}</td>
       </tr>
     `).join('');
+  }
+
+  async function toggleDriver(userId, makeDriver, btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/driver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_driver: makeDriver === true || makeDriver === 'true' }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await loadUsers();
+    } catch (e) {
+      alert('No se pudo actualizar: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = makeDriver ? '🛵 Designar repartidor' : 'Quitar acceso';
+    }
   }
 
   function esc(text) {
@@ -495,7 +667,7 @@
       renderUsers();
     } catch (e) {
       document.getElementById('users-tbody').innerHTML =
-        `<tr><td colspan="6" style="text-align:center;color:#EF5350;padding:32px">Error: ${esc(e.message)}</td></tr>`;
+        `<tr><td colspan="7" style="text-align:center;color:#EF5350;padding:32px">Error: ${esc(e.message)}</td></tr>`;
       document.getElementById('users-summary').textContent = 'No se pudieron cargar los usuarios';
     }
   }

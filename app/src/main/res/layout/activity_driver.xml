@@ -375,7 +375,47 @@
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:textColor="@color/zuppon_green"
                     android:textSize="15sp" android:textStyle="bold"
-                    android:layout_marginBottom="12dp" />
+                    android:layout_marginBottom="8dp" />
+
+                <TextView android:id="@+id/tv_active_client_name"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp"
+                    android:visibility="gone" />
+
+                <TextView android:id="@+id/tv_active_client_phone"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:textColor="@color/zuppon_text_secondary"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_active_chat"
+                        style="@style/ZupponButtonOutline"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:text="💬 Chat" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_active_call"
+                        style="@style/ZupponButtonGreen"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="📞 Llamar"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_trip_action"

@@ -8,9 +8,21 @@ import retrofit2.Call
 import retrofit2.http.*
 import okhttp3.MultipartBody
 
+data class BuyerDto(
+    val user_id: Int? = null,
+    val username: String? = null,
+    val email: String? = null,
+    val display_name: String? = null,
+    val phone: String? = null,
+    val label: String? = null
+)
+
 data class OrderDto(
     val id: Int = 0,
+    val user_id: Int? = null,
     val client_name: String = "",
+    val client_phone: String = "",
+    val buyer: BuyerDto? = null,
     val items: String = "",
     val destination: String = "",
     val fare: Double = 0.0,
@@ -42,6 +54,7 @@ data class CreateOrderRequest(
     val destination: String,
     val fare: Double,
     val client_name: String = "Cliente",
+    val client_phone: String = "",
     val dest_lat: Double = 0.0,
     val dest_lng: Double = 0.0
 )

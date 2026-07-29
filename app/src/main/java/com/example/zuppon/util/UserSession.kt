@@ -52,6 +52,8 @@ object UserSession {
 
     fun needsUsername(): Boolean = getUser()?.needs_username == true
 
+    fun canDrive(): Boolean = getUser()?.is_driver == true
+
     fun userId(): Int? = getUser()?.id?.takeIf { it > 0 }
 
     fun displayName(): String = getUser()?.displayLabel() ?: "Invitado"

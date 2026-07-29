@@ -83,6 +83,7 @@ class Order(db.Model):
     id           = db.Column(db.Integer, primary_key=True)
     user_id      = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     client_name  = db.Column(db.String(100), default="Cliente")
+    client_phone = db.Column(db.String(32), default="")
     items        = db.Column(db.Text, nullable=False)        # resumen del pedido
     destination  = db.Column(db.Text, nullable=False)        # dirección de entrega
     dest_lat     = db.Column(db.Float, default=0.0)            # coords de entrega (mapa)
@@ -108,10 +109,23 @@ class Order(db.Model):
     completed_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):
+        owner = self.owner if self.user_id else None
         return {
             "id":             self.id,
             "user_id":        self.user_id,
             "client_name":    self.client_name,
+            "client_phone":   self.client_phone or "",
+            "buyer": {
+                "user_id":      self.user_id,
+                "username":     owner.username if owner else None,
+                "email":        owner.email if owner else None,
+                "display_name": owner.display_name if owner else None,
+                "phone":        self.client_phone or "",
+                "label": (
+                    f"@{owner.username}" if owner and owner.username
+                    else (owner.display_name if owner and owner.display_name else self.client_name)
+                ) or "Cliente",
+            },
             "items":          self.items,
             "destination":    self.destination,
             "dest_lat":       self.dest_lat or 0.0,
@@ -169,6 +183,7 @@ class User(db.Model):
     display_name  = db.Column(db.String(255), nullable=True)
     username      = db.Column(db.String(30), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=True)
+    is_driver     = db.Column(db.Boolean, default=False)
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -178,6 +193,7 @@ class User(db.Model):
             "display_name":   self.display_name,
             "username":       self.username,
             "needs_username": self.username is None,
+            "is_driver":      bool(self.is_driver),
         }
 
     def to_admin_dict(self, orders_count: int = 0):

@@ -69,11 +69,24 @@ def _ensure_order_columns():
         alters.append("ALTER TABLE orders ADD COLUMN paid_at DATETIME")
     if "user_id" not in existing:
         alters.append("ALTER TABLE orders ADD COLUMN user_id INTEGER")
+    if "client_phone" not in existing:
+        alters.append("ALTER TABLE orders ADD COLUMN client_phone VARCHAR(32) DEFAULT ''")
     if not alters:
         return
     with db.engine.begin() as conn:
         for stmt in alters:
             conn.execute(text(stmt))
+
+
+def _ensure_user_columns():
+    """Migraciones ligeras para columnas nuevas en users."""
+    inspector = inspect(db.engine)
+    if "users" not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns("users")}
+    if "is_driver" not in existing:
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN is_driver BOOLEAN DEFAULT 0"))
 
 
 def _public_base_url() -> str:
@@ -148,6 +161,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 with app.app_context():
     db.create_all()
     _ensure_order_columns()
+    _ensure_user_columns()
     if MenuItem.query.count() == 0:
         for row in MENU_SEED:
             db.session.add(MenuItem(
@@ -247,6 +261,18 @@ def admin_users():
     return jsonify({"total": len(users), "users": payload})
 
 
+@app.route("/api/admin/users/<int:user_id>/driver", methods=["POST"])
+def admin_set_driver(user_id):
+    """Designar o quitar acceso al panel de repartidor."""
+    user = User.query.get_or_404(user_id)
+    data = request.get_json() or {}
+    user.is_driver = bool(data.get("is_driver", False))
+    db.session.commit()
+
+    orders_count = Order.query.filter_by(user_id=user.id).count()
+    return jsonify({"user": user.to_admin_dict(orders_count=orders_count)})
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  REST — Pedidos
 # ═════════════════════════════════════════════════════════════════════════════
@@ -277,6 +303,7 @@ def create_order():
     user_id = auth.bearer_user_id()
     user = db.session.get(User, user_id) if user_id else None
     client_name = _client_label(user, data.get("client_name", "Cliente"))
+    client_phone = (data.get("client_phone") or "").strip()
 
     amount_gs = payment_config.usd_to_gs(float(data["fare"]))
     order = Order(
@@ -286,6 +313,7 @@ def create_order():
         dest_lng=float(data.get("dest_lng", 0.0) or 0.0),
         fare=float(data["fare"]),
         client_name=client_name,
+        client_phone=client_phone,
         user_id=user.id if user else None,
         amount_gs=amount_gs,
         payment_status="AWAITING_PAYMENT",

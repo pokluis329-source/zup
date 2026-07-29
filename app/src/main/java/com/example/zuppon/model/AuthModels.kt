@@ -5,7 +5,8 @@ data class AuthUser(
     val email: String? = null,
     val display_name: String? = null,
     val username: String? = null,
-    val needs_username: Boolean = false
+    val needs_username: Boolean = false,
+    val is_driver: Boolean = false
 ) {
     fun displayLabel(): String =
         username?.let { "@$it" } ?: display_name ?: email ?: "Usuario"

@@ -45,7 +45,9 @@ data class TripRequest(
     val fare: Double,
     /** Coordenadas exactas del punto de entrega — evita re-geocodificación */
     val destLat: Double = 0.0,
-    val destLng: Double = 0.0
+    val destLng: Double = 0.0,
+    val clientName: String = "",
+    val clientPhone: String = ""
 ) {
     /** true si las coordenadas fueron provistas y son válidas */
     val hasCoords: Boolean get() = destLat != 0.0 && destLng != 0.0

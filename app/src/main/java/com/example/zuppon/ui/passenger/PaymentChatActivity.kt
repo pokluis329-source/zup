@@ -1,5 +1,6 @@
 package com.example.zuppon.ui.passenger
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -22,8 +23,8 @@ import com.example.zuppon.model.PaymentMessage
 import com.example.zuppon.network.ApiClient
 import com.example.zuppon.network.NetworkRepository
 import com.example.zuppon.repository.TripRepository
-import java.net.URL
 import java.io.ByteArrayOutputStream
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -36,6 +37,19 @@ class PaymentChatActivity : AppCompatActivity() {
     private var amountGs: Int = 0
     private var alias: String = ""
     private var cedula: String = ""
+    private var isDriver: Boolean = false
+    private var contactName: String = ""
+    private var contactPhone: String = ""
+    private var messageSender: String = "client"
+
+    private val refreshRunnable = object : Runnable {
+        override fun run() {
+            if (!isFinishing) {
+                loadMessages(silent = true)
+                main.postDelayed(this, 5000L)
+            }
+        }
+    }
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { uploadReceipt(it) }
@@ -49,45 +63,98 @@ class PaymentChatActivity : AppCompatActivity() {
         amountGs = intent.getIntExtra(EXTRA_AMOUNT_GS, 0)
         alias = intent.getStringExtra(EXTRA_ALIAS).orEmpty()
         cedula = intent.getStringExtra(EXTRA_CEDULA).orEmpty()
+        isDriver = intent.getBooleanExtra(EXTRA_IS_DRIVER, false)
+        contactName = intent.getStringExtra(EXTRA_CONTACT_NAME).orEmpty()
+        contactPhone = intent.getStringExtra(EXTRA_CONTACT_PHONE).orEmpty()
+        messageSender = if (isDriver) "driver" else "client"
 
         if (orderId == -1) {
             finish()
             return
         }
 
-        supportActionBar?.title = "Pago pedido #$orderId"
+        supportActionBar?.title = if (isDriver) "Chat pedido #$orderId" else "Pago pedido #$orderId"
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        findViewById<TextView>(R.id.tv_payment_amount).text =
-            "Gs ${formatGs(amountGs)}"
-        findViewById<TextView>(R.id.tv_payment_alias).text = "Alias: $alias"
-        findViewById<TextView>(R.id.tv_payment_cedula).text = "CI: $cedula"
+        findViewById<TextView>(R.id.tv_chat_title).text =
+            if (isDriver) "Chat con el cliente" else "Transferencia y chat"
+
+        val paymentInfo = findViewById<View>(R.id.layout_payment_info)
+        if (isDriver) {
+            paymentInfo.visibility = View.GONE
+        } else {
+            findViewById<TextView>(R.id.tv_payment_amount).text = "Gs ${formatGs(amountGs)}"
+            findViewById<TextView>(R.id.tv_payment_alias).text = "Alias: $alias"
+            findViewById<TextView>(R.id.tv_payment_cedula).text = "CI: $cedula"
+        }
+
+        setupContactHeader()
+
+        val attachBtn = findViewById<View>(R.id.btn_attach_receipt)
+        attachBtn.visibility = if (isDriver) View.GONE else View.VISIBLE
 
         val rv = findViewById<RecyclerView>(R.id.rv_payment_chat)
         chatList = rv
-        adapter = PaymentChatAdapter()
+        adapter = PaymentChatAdapter(isDriver)
         rv.apply {
             layoutManager = LinearLayoutManager(this@PaymentChatActivity)
             adapter = this@PaymentChatActivity.adapter
         }
 
-        findViewById<View>(R.id.btn_attach_receipt).setOnClickListener {
-            pickImage.launch("image/*")
-        }
+        attachBtn.setOnClickListener { pickImage.launch("image/*") }
 
         findViewById<View>(R.id.btn_send_message).setOnClickListener {
             val et = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_chat_message)
             val text = et.text?.toString()?.trim().orEmpty()
             if (text.isBlank()) return@setOnClickListener
             et.text?.clear()
-            NetworkRepository.sendPaymentMessage(orderId, text,
+            NetworkRepository.sendPaymentMessage(
+                orderId, text, messageSender,
                 onSuccess = { loadMessages() },
                 onError = { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() }
             )
         }
 
         loadMessages()
-        TripRepository.ensurePassengerPolling()
+        if (isDriver) TripRepository.ensurePolling() else TripRepository.ensurePassengerPolling()
+    }
+
+    private fun setupContactHeader() {
+        val nameTv = findViewById<TextView>(R.id.tv_contact_name)
+        val phoneTv = findViewById<TextView>(R.id.tv_contact_phone)
+        val callBtn = findViewById<View>(R.id.btn_call_contact)
+
+        if (isDriver && contactName.isNotBlank()) {
+            nameTv.text = "👤 $contactName"
+            nameTv.visibility = View.VISIBLE
+        }
+        if (isDriver && contactPhone.isNotBlank()) {
+            phoneTv.text = "📞 $contactPhone"
+            phoneTv.visibility = View.VISIBLE
+            callBtn.visibility = View.VISIBLE
+            callBtn.setOnClickListener { dialPhone(contactPhone) }
+        } else {
+            callBtn.visibility = View.GONE
+        }
+    }
+
+    private fun dialPhone(phone: String) {
+        val digits = phone.filter { it.isDigit() || it == '+' }
+        if (digits.length < 6) {
+            Toast.makeText(this, "Teléfono no válido", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$digits")))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        main.postDelayed(refreshRunnable, 5000L)
+    }
+
+    override fun onPause() {
+        main.removeCallbacks(refreshRunnable)
+        super.onPause()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -95,11 +162,7 @@ class PaymentChatActivity : AppCompatActivity() {
         return true
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-    }
-
-    private fun loadMessages() {
+    private fun loadMessages(silent: Boolean = false) {
         NetworkRepository.fetchPaymentMessages(orderId,
             onSuccess = { msgs ->
                 main.post {
@@ -107,7 +170,11 @@ class PaymentChatActivity : AppCompatActivity() {
                     chatList.scrollToPosition((msgs.size - 1).coerceAtLeast(0))
                 }
             },
-            onError = { }
+            onError = {
+                if (!silent) main.post {
+                    Toast.makeText(this, "No se pudo cargar el chat", Toast.LENGTH_SHORT).show()
+                }
+            }
         )
     }
 
@@ -175,10 +242,15 @@ class PaymentChatActivity : AppCompatActivity() {
         const val EXTRA_AMOUNT_GS = "amount_gs"
         const val EXTRA_ALIAS = "alias"
         const val EXTRA_CEDULA = "cedula"
+        const val EXTRA_IS_DRIVER = "is_driver"
+        const val EXTRA_CONTACT_NAME = "contact_name"
+        const val EXTRA_CONTACT_PHONE = "contact_phone"
     }
 }
 
-private class PaymentChatAdapter : RecyclerView.Adapter<PaymentChatAdapter.VH>() {
+private class PaymentChatAdapter(
+    private val isDriverView: Boolean
+) : RecyclerView.Adapter<PaymentChatAdapter.VH>() {
 
     private val items = mutableListOf<PaymentMessage>()
 
@@ -191,7 +263,7 @@ private class PaymentChatAdapter : RecyclerView.Adapter<PaymentChatAdapter.VH>()
     override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): VH {
         val v = android.view.LayoutInflater.from(parent.context)
             .inflate(R.layout.item_payment_message, parent, false)
-        return VH(v)
+        return VH(v, isDriverView)
     }
 
     override fun getItemCount() = items.size
@@ -200,16 +272,16 @@ private class PaymentChatAdapter : RecyclerView.Adapter<PaymentChatAdapter.VH>()
         holder.bind(items[position])
     }
 
-    class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    class VH(itemView: View, private val isDriverView: Boolean) : RecyclerView.ViewHolder(itemView) {
         private val container = itemView.findViewById<LinearLayout>(R.id.bubble_container)
         private val body = itemView.findViewById<TextView>(R.id.tv_message_body)
         private val image = itemView.findViewById<ImageView>(R.id.iv_receipt)
         private val time = itemView.findViewById<TextView>(R.id.tv_message_time)
 
         fun bind(msg: PaymentMessage) {
-            val isClient = msg.sender == "client"
+            val isMine = if (isDriverView) msg.sender == "driver" else msg.sender == "client"
             val lp = container.layoutParams as FrameLayout.LayoutParams
-            lp.gravity = if (isClient) Gravity.END else Gravity.START
+            lp.gravity = if (isMine) Gravity.END else Gravity.START
             container.layoutParams = lp
 
             when (msg.type) {

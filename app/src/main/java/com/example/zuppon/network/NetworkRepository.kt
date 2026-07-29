@@ -40,6 +40,7 @@ object NetworkRepository {
     fun createOrder(
         items: String, destination: String, fare: Double,
         clientName: String = "Cliente",
+        clientPhone: String = "",
         destLat: Double = 0.0, destLng: Double = 0.0,
         onSuccess: (OrderDto) -> Unit = {}, onError: (String) -> Unit = {}
     ) {
@@ -49,7 +50,7 @@ object NetworkRepository {
         }
         bg {
             val resp = api.createOrder(
-                CreateOrderRequest(items, destination, fare, clientName, destLat, destLng)
+                CreateOrderRequest(items, destination, fare, clientName, clientPhone, destLat, destLng)
             ).execute()
             if (resp.isSuccessful) {
                 val order = resp.body()!!
@@ -109,12 +110,13 @@ object NetworkRepository {
     fun sendPaymentMessage(
         orderId: Int,
         body: String,
+        sender: String = "client",
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         val api = ApiClient.api ?: run { onError("Sin conexión"); return }
         bg {
-            val resp = api.sendPaymentMessage(orderId, SendMessageRequest(body)).execute()
+            val resp = api.sendPaymentMessage(orderId, SendMessageRequest(body, sender)).execute()
             if (resp.isSuccessful) main.post { onSuccess() }
             else main.post { onError("HTTP ${resp.code()}") }
         }

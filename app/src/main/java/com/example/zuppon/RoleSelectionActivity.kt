@@ -6,6 +6,7 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import androidx.appcompat.app.AppCompatActivity
+import com.example.zuppon.auth.AuthRepository
 import com.example.zuppon.databinding.ActivityRoleSelectionBinding
 import com.example.zuppon.ui.driver.DriverActivity
 import com.example.zuppon.ui.passenger.PassengerActivity
@@ -42,17 +43,32 @@ class RoleSelectionActivity : AppCompatActivity() {
         }
 
         binding.cardDriver.setOnClickListener {
+            if (!UserSession.canDrive()) return@setOnClickListener
             startActivity(Intent(this, DriverActivity::class.java))
         }
 
         binding.cardProfile.setOnClickListener {
             startActivity(Intent(this, ProfileActivity::class.java))
         }
+
+        bindDriverAccess()
     }
 
     override fun onResume() {
         super.onResume()
         bindProfileCard()
+        refreshDriverAccess()
+    }
+
+    private fun refreshDriverAccess() {
+        if (!UserSession.isLoggedIn()) {
+            bindDriverAccess()
+            return
+        }
+        AuthRepository.fetchMe(
+            onSuccess = { bindDriverAccess() },
+            onError = { bindDriverAccess() }
+        )
     }
 
     private fun bindProfileCard() {
@@ -66,7 +82,8 @@ class RoleSelectionActivity : AppCompatActivity() {
         }
     }
 
-    private fun animateTap(view: View, onEnd: () -> Unit) {
-        onEnd()
+    private fun bindDriverAccess() {
+        val canDrive = UserSession.canDrive()
+        binding.cardDriver.visibility = if (canDrive) View.VISIBLE else View.GONE
     }
 }

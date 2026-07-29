@@ -900,6 +900,12 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         val phone = binding.etBuyerPhone.text?.toString()?.trim().orEmpty()
         val name  = binding.etBuyerName.text?.toString()?.trim().orEmpty().ifBlank { "Cliente" }
 
+        if (phone.length < 6) {
+            Toast.makeText(this, "Ingresá tu teléfono para que el repartidor pueda contactarte", Toast.LENGTH_LONG).show()
+            binding.etBuyerPhone.requestFocus()
+            return
+        }
+
         binding.btnRequestRide.isEnabled = false
         binding.btnRequestRide.text = "creando pedido…"
 

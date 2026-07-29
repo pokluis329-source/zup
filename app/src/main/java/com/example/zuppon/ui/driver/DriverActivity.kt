@@ -3,6 +3,7 @@ package com.example.zuppon.ui.driver
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Looper
 import android.view.View
@@ -20,6 +21,8 @@ import com.example.zuppon.model.TripRequest
 import com.example.zuppon.model.TripState
 import com.example.zuppon.repository.DriverStatus
 import com.example.zuppon.repository.TripRepository
+import com.example.zuppon.network.NetworkRepository
+import com.example.zuppon.ui.passenger.PaymentChatActivity
 import com.example.zuppon.util.DirectionsHelper
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -37,7 +40,9 @@ import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
-import com.google.android.material.bottomsheet.BottomSheetDialog
+import android.widget.Toast
+import com.example.zuppon.auth.AuthRepository
+import com.example.zuppon.util.UserSession
 
 class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -64,6 +69,18 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (!UserSession.canDrive()) {
+            Toast.makeText(
+                this,
+                "No tenés acceso al panel de repartidor. Pedí que te designen desde el admin.",
+                Toast.LENGTH_LONG
+            ).show()
+            startActivity(Intent(this, RoleSelectionActivity::class.java))
+            finish()
+            return
+        }
+
         binding = ActivityDriverBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -90,6 +107,51 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.btnTripAction.setOnClickListener {
             lastRouteDraw = 0L
             viewModel.advanceTripStep()
+        }
+        binding.btnActiveChat.setOnClickListener { openClientChat() }
+        binding.btnActiveCall.setOnClickListener {
+            TripRepository.pendingRequest.value?.clientPhone?.let { dialPhone(it) }
+        }
+    }
+
+    private fun openClientChat() {
+        val req = TripRepository.pendingRequest.value ?: return
+        val orderId = NetworkRepository.serverOrderId
+        if (orderId == -1) return
+        val name = req.clientName.ifBlank { "Cliente" }
+        startActivity(
+            Intent(this, PaymentChatActivity::class.java).apply {
+                putExtra(PaymentChatActivity.EXTRA_ORDER_ID, orderId)
+                putExtra(PaymentChatActivity.EXTRA_IS_DRIVER, true)
+                putExtra(PaymentChatActivity.EXTRA_CONTACT_NAME, name)
+                putExtra(PaymentChatActivity.EXTRA_CONTACT_PHONE, req.clientPhone)
+            }
+        )
+    }
+
+    private fun dialPhone(phone: String) {
+        val digits = phone.filter { it.isDigit() || it == '+' }
+        if (digits.length < 6) return
+        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$digits")))
+    }
+
+    private fun bindActiveClientInfo(req: TripRequest?) {
+        if (req == null) {
+            binding.tvActiveClientName.visibility = View.GONE
+            binding.tvActiveClientPhone.visibility = View.GONE
+            binding.btnActiveCall.visibility = View.GONE
+            return
+        }
+        val name = req.clientName.ifBlank { "Cliente" }
+        binding.tvActiveClientName.text = "👤 $name"
+        binding.tvActiveClientName.visibility = View.VISIBLE
+        if (req.clientPhone.isNotBlank()) {
+            binding.tvActiveClientPhone.text = "📞 ${req.clientPhone}"
+            binding.tvActiveClientPhone.visibility = View.VISIBLE
+            binding.btnActiveCall.visibility = View.VISIBLE
+        } else {
+            binding.tvActiveClientPhone.visibility = View.GONE
+            binding.btnActiveCall.visibility = View.GONE
         }
     }
 
@@ -171,6 +233,12 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         TripRepository.orderHistory.observe(this) { renderHistory(it) }
+
+        TripRepository.pendingRequest.observe(this) { req ->
+            if (binding.layoutActiveTrip.visibility == View.VISIBLE) {
+                bindActiveClientInfo(req)
+            }
+        }
     }
 
     // ── Pins de pedidos en el mapa ────────────────────────────────────────────
@@ -266,6 +334,20 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         b.tvDlgDestination.text = req.destination
         b.tvDlgFare.text        = formatGs(req.fare)
 
+        val clientLine = buildString {
+            if (req.clientName.isNotBlank()) append("👤 ${req.clientName}")
+            if (req.clientPhone.isNotBlank()) {
+                if (isNotEmpty()) append("\n")
+                append("📞 ${req.clientPhone}")
+            }
+        }
+        if (clientLine.isNotBlank()) {
+            b.tvDlgClient.text = clientLine
+            b.tvDlgClient.visibility = View.VISIBLE
+        } else {
+            b.tvDlgClient.visibility = View.GONE
+        }
+
         b.btnDlgAccept.setOnClickListener {
             sheet.dismiss()
             viewModel.acceptOrder(serverId)
@@ -347,15 +429,17 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
             is TripState.DriverOnWay -> {
                 if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP) {
                     binding.layoutActiveTrip.visibility = View.VISIBLE
+                    bindActiveClientInfo(TripRepository.pendingRequest.value)
                     TripRepository.pendingRequest.value?.let { drawRouteToRequest(it) }
                 } else {
                     binding.layoutOnline.visibility = View.VISIBLE
                 }
             }
             is TripState.DriverArrived, is TripState.InProgress -> {
-                if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP)
+                if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP) {
                     binding.layoutActiveTrip.visibility = View.VISIBLE
-                else
+                    bindActiveClientInfo(TripRepository.pendingRequest.value)
+                } else
                     binding.layoutOnline.visibility = View.VISIBLE
             }
             is TripState.Completed -> {
@@ -388,6 +472,18 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
+        if (!UserSession.canDrive()) {
+            denyDriverAccess()
+            return
+        }
+        if (UserSession.isLoggedIn()) {
+            AuthRepository.fetchMe(
+                onSuccess = { user ->
+                    if (!user.is_driver) denyDriverAccess()
+                },
+                onError = { }
+            )
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) startDriverTracking()
         val status = TripRepository.driverStatus.value ?: return
@@ -396,6 +492,17 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
         if (status == DriverStatus.ACTIVE_TRIP && req != null && driverMap != null) {
             drawRouteToRequest(req)
         }
+    }
+
+    private fun denyDriverAccess() {
+        Toast.makeText(
+            this,
+            "No tenés acceso al panel de repartidor",
+            Toast.LENGTH_LONG
+        ).show()
+        viewModel.goOffline()
+        startActivity(Intent(this, RoleSelectionActivity::class.java))
+        finish()
     }
 
     override fun onPause() {
