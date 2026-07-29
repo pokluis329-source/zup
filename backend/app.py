@@ -103,6 +103,10 @@ def _payment_welcome_message(amount_gs: int) -> str:
     )
 
 
+def _payment_ready(order) -> bool:
+    return order.payment_status in ("PAID", "CASH_ON_DELIVERY")
+
+
 def mark_order_paid(order: Order, notify_drivers: bool = True):
     """Marca un pedido como pagado y lo publica a repartidores."""
     if order.payment_status == "PAID":
@@ -294,7 +298,7 @@ def get_order(order_id):
 
 @app.route("/api/orders", methods=["POST"])
 def create_order():
-    """Cliente crea un nuevo pedido (pago por transferencia)."""
+    """Cliente crea un nuevo pedido (transferencia o efectivo al entregar)."""
     data = request.get_json() or {}
     required = ["items", "destination", "fare"]
     if not all(k in data for k in required):
@@ -304,6 +308,9 @@ def create_order():
     user = db.session.get(User, user_id) if user_id else None
     client_name = _client_label(user, data.get("client_name", "Cliente"))
     client_phone = (data.get("client_phone") or "").strip()
+
+    payment_method = (data.get("payment_method") or "transfer").strip().lower()
+    payment_status = "CASH_ON_DELIVERY" if payment_method == "cash" else "AWAITING_PAYMENT"
 
     amount_gs = payment_config.usd_to_gs(float(data["fare"]))
     order = Order(
@@ -316,13 +323,16 @@ def create_order():
         client_phone=client_phone,
         user_id=user.id if user else None,
         amount_gs=amount_gs,
-        payment_status="AWAITING_PAYMENT",
+        payment_status=payment_status,
         status="PENDING",
     )
     db.session.add(order)
     db.session.commit()
-    _seed_payment_chat(order)
-    db.session.commit()
+    if payment_status == "AWAITING_PAYMENT":
+        _seed_payment_chat(order)
+        db.session.commit()
+    else:
+        socketio.emit("new_order", order.to_dict(), room="drivers")
 
     payload = order.to_dict()
     payload["payment"] = payment_config.payment_info(amount_gs)
@@ -341,7 +351,7 @@ def payment_status(order_id):
     return jsonify({
         "order_id": order.id,
         "payment_status": order.payment_status,
-        "paid": order.payment_status == "PAID",
+        "paid": _payment_ready(order),
         "payment": payment_config.payment_info(order.amount_gs),
     })
 
@@ -379,7 +389,7 @@ def post_payment_message(order_id):
 @app.route("/api/orders/<int:order_id>/messages/receipt", methods=["POST"])
 def upload_receipt(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.payment_status == "PAID":
+    if _payment_ready(order):
         return jsonify({"error": "El pedido ya está pagado"}), 409
 
     file = request.files.get("image") or request.files.get("file")
@@ -454,7 +464,7 @@ def accept_order(order_id):
 
     if order.status != "PENDING":
         return jsonify({"error": "El pedido no está disponible"}), 409
-    if order.payment_status != "PAID":
+    if not _payment_ready(order):
         return jsonify({"error": "El pedido aún no fue pagado"}), 409
 
     order.status = "ACCEPTED"

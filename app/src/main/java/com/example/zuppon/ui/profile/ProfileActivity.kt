@@ -139,6 +139,7 @@ class ProfileActivity : AppCompatActivity() {
         order.status == "CANCELLED" -> "❌ Cancelado"
         order.payment_status == "AWAITING_PAYMENT" -> "💸 Esperando pago"
         order.payment_status == "PENDING_REVIEW" -> "📸 Verificando pago"
+        order.payment_status == "CASH_ON_DELIVERY" -> "💵 Efectivo al entregar"
         order.status == "DELIVERING" -> "🛵 En camino"
         order.status == "ACCEPTED" -> "✅ Repartidor asignado"
         else -> "⏳ ${order.status}"

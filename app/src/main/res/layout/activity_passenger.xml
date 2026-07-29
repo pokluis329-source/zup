@@ -291,25 +291,47 @@
                 </androidx.cardview.widget.CardView>
             </LinearLayout>
 
-            <!-- Transferencia -->
+            <!-- Forma de pago -->
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="pagás por transferencia al confirmar 💸"
-                android:textColor="@color/zuppon_text_secondary" android:textSize="13sp"
-                android:layout_marginBottom="12dp" />
+                android:text="¿cómo vas a pagar?"
+                android:textColor="@color/zuppon_text_primary" android:textSize="15sp"
+                android:textStyle="bold" android:layout_marginBottom="10dp" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/til_buyer_name"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/toggle_payment_method"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="nombre"
-                app:boxStrokeColor="@color/zuppon_accent"
-                app:boxBackgroundColor="@color/zuppon_card">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/et_buyer_name"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:textColor="@color/zuppon_text_primary" android:inputType="textPersonName" />
-            </com.google.android.material.textfield.TextInputLayout>
+                app:singleSelection="true"
+                app:selectionRequired="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_pay_transfer"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Transferencia 💸"
+                    android:textAllCaps="false" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_pay_cash"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Efectivo 💵"
+                    android:textAllCaps="false" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <TextView
+                android:id="@+id/tv_payment_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="transferís y enviás comprobante al confirmar"
+                android:textColor="@color/zuppon_text_secondary"
+                android:textSize="13sp"
+                android:layout_marginBottom="12dp" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/til_buyer_phone"

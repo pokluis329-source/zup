@@ -21,12 +21,15 @@ data class ActiveOrder(
     val phase: ActiveOrderPhase,
     val driverName: String? = null,
     val driverVehicle: String? = null,
+    val cashOnDelivery: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     fun statusLabel(): String = when (phase) {
         ActiveOrderPhase.AWAITING_PAYMENT -> "💸 Transferí y enviá comprobante"
         ActiveOrderPhase.PENDING_REVIEW   -> "📸 Comprobante enviado · verificando"
-        ActiveOrderPhase.SEARCHING_DRIVER -> "⚡ Pago ok · buscando repartidor"
+        ActiveOrderPhase.SEARCHING_DRIVER ->
+            if (cashOnDelivery) "💵 Pagás al entregar · buscando repartidor"
+            else "⚡ Pago ok · buscando repartidor"
         ActiveOrderPhase.DRIVER_ASSIGNED  -> "🛵 Repartidor en camino"
         ActiveOrderPhase.PICKED_UP        -> "✅ Pedido recogido"
         ActiveOrderPhase.DELIVERING       -> "🍔 En camino a vos"

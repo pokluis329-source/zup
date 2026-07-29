@@ -20,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.zuppon.R
 import com.example.zuppon.call.CallUiState
@@ -88,6 +89,7 @@ class PaymentChatActivity : AppCompatActivity() {
         alias = intent.getStringExtra(EXTRA_ALIAS).orEmpty()
         cedula = intent.getStringExtra(EXTRA_CEDULA).orEmpty()
         isDriver = intent.getBooleanExtra(EXTRA_IS_DRIVER, false)
+        val cashOnDelivery = intent.getBooleanExtra(EXTRA_CASH_ON_DELIVERY, false)
         contactName = intent.getStringExtra(EXTRA_CONTACT_NAME).orEmpty()
         contactPhone = intent.getStringExtra(EXTRA_CONTACT_PHONE).orEmpty()
         messageSender = if (isDriver) "driver" else "client"
@@ -97,14 +99,21 @@ class PaymentChatActivity : AppCompatActivity() {
             return
         }
 
-        supportActionBar?.title = if (isDriver) "Chat pedido #$orderId" else "Pago pedido #$orderId"
+        supportActionBar?.title = when {
+            isDriver -> "Chat pedido #$orderId"
+            cashOnDelivery -> "Chat pedido #$orderId"
+            else -> "Pago pedido #$orderId"
+        }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        findViewById<TextView>(R.id.tv_chat_title).text =
-            if (isDriver) "Chat con el cliente" else "Transferencia y chat"
+        findViewById<TextView>(R.id.tv_chat_title).text = when {
+            isDriver -> "Chat con el cliente"
+            cashOnDelivery -> "Chat del pedido"
+            else -> "Transferencia y chat"
+        }
 
         val paymentInfo = findViewById<View>(R.id.layout_payment_info)
-        if (isDriver) {
+        if (isDriver || cashOnDelivery) {
             paymentInfo.visibility = View.GONE
         } else {
             findViewById<TextView>(R.id.tv_payment_amount).text = "Gs ${formatGs(amountGs)}"
@@ -116,7 +125,7 @@ class PaymentChatActivity : AppCompatActivity() {
         setupVoiceCall()
 
         val attachBtn = findViewById<View>(R.id.btn_attach_receipt)
-        attachBtn.visibility = if (isDriver) View.GONE else View.VISIBLE
+        attachBtn.visibility = if (isDriver || cashOnDelivery) View.GONE else View.VISIBLE
 
         val rv = findViewById<RecyclerView>(R.id.rv_payment_chat)
         chatList = rv
@@ -295,8 +304,11 @@ class PaymentChatActivity : AppCompatActivity() {
         NetworkRepository.fetchPaymentMessages(orderId,
             onSuccess = { msgs ->
                 main.post {
+                    val hadMessages = adapter.itemCount
                     adapter.submit(msgs)
-                    chatList.scrollToPosition((msgs.size - 1).coerceAtLeast(0))
+                    if (msgs.size > hadMessages) {
+                        chatList.scrollToPosition((msgs.size - 1).coerceAtLeast(0))
+                    }
                 }
             },
             onError = {
@@ -375,6 +387,7 @@ class PaymentChatActivity : AppCompatActivity() {
         const val EXTRA_CONTACT_NAME = "contact_name"
         const val EXTRA_CONTACT_PHONE = "contact_phone"
         const val EXTRA_AUTO_ACCEPT = "auto_accept"
+        const val EXTRA_CASH_ON_DELIVERY = "cash_on_delivery"
     }
 }
 
@@ -385,9 +398,17 @@ private class PaymentChatAdapter(
     private val items = mutableListOf<PaymentMessage>()
 
     fun submit(list: List<PaymentMessage>) {
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = items.size
+            override fun getNewListSize() = list.size
+            override fun areItemsTheSame(old: Int, new: Int) =
+                items[old].id == list[new].id
+            override fun areContentsTheSame(old: Int, new: Int) =
+                items[old] == list[new]
+        })
         items.clear()
         items.addAll(list)
-        notifyDataSetChanged()
+        diff.dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): VH {

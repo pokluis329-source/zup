@@ -42,6 +42,7 @@ object NetworkRepository {
         clientName: String = "Cliente",
         clientPhone: String = "",
         destLat: Double = 0.0, destLng: Double = 0.0,
+        paymentMethod: String = "transfer",
         onSuccess: (OrderDto) -> Unit = {}, onError: (String) -> Unit = {}
     ) {
         val api = ApiClient.api ?: run {
@@ -50,7 +51,9 @@ object NetworkRepository {
         }
         bg {
             val resp = api.createOrder(
-                CreateOrderRequest(items, destination, fare, clientName, clientPhone, destLat, destLng)
+                CreateOrderRequest(
+                    items, destination, fare, clientName, clientPhone, destLat, destLng, paymentMethod
+                )
             ).execute()
             if (resp.isSuccessful) {
                 val order = resp.body()!!

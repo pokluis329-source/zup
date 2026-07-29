@@ -112,11 +112,14 @@ object TripRepository {
         request: TripRequest,
         buyerPhone: String = "",
         buyerName: String = "Cliente",
+        paymentMethod: String = "transfer",
         onOrderCreated: (OrderDto) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         _pendingRequest.value = request
-        _tripState.value = TripState.AwaitingPayment
+        if (paymentMethod != "cash") {
+            _tripState.value = TripState.AwaitingPayment
+        }
 
         val record = OrderRecord(
             items       = request.passengerName,
@@ -135,9 +138,16 @@ object TripRepository {
             clientPhone = buyerPhone,
             destLat     = request.destLat,
             destLng     = request.destLng,
+            paymentMethod = paymentMethod,
             onSuccess   = { order ->
                 com.example.zuppon.network.NetworkRepository.serverOrderId = order.id
                 currentOrderId = order.id.toLong()
+                val isCash = order.payment_status == "CASH_ON_DELIVERY"
+                val phase = if (isCash) {
+                    ActiveOrderPhase.SEARCHING_DRIVER
+                } else {
+                    ActiveOrderPhase.AWAITING_PAYMENT
+                }
                 val active = ActiveOrder(
                     serverOrderId = order.id,
                     items         = request.passengerName,
@@ -146,9 +156,14 @@ object TripRepository {
                     amountGs      = order.amount_gs.takeIf { it > 0 } ?: order.fare_gs,
                     alias         = order.payment?.alias ?: "zup.cacupe",
                     cedula        = order.payment?.cedula ?: "6208713",
-                    phase         = ActiveOrderPhase.AWAITING_PAYMENT
+                    phase         = phase,
+                    cashOnDelivery = isCash
                 )
                 saveActiveOrder(active)
+                if (isCash) {
+                    setTripState(TripState.SearchingDriver)
+                    _userMessage.value = "Pedido confirmado 🎉 Buscando repartidor…"
+                }
                 startPassengerPolling()
                 onOrderCreated(order)
             },
@@ -405,9 +420,15 @@ object TripRepository {
     // ── Pedido activo del pasajero ────────────────────────────────────────────
 
     private fun saveActiveOrder(order: ActiveOrder) {
+        if (_activeOrder.value == order) return
         _activeOrder.value = order
         appContext?.let { ActiveOrderStorage.save(it, order) }
         syncCallWatcher()
+    }
+
+    private fun setTripState(state: TripState) {
+        if (_tripState.value == state) return
+        _tripState.value = state
     }
 
     private fun updateActiveOrderPhase(phase: ActiveOrderPhase) {
@@ -443,7 +464,8 @@ object TripRepository {
             amountGs      = dto.amount_gs.takeIf { it > 0 } ?: dto.fare_gs,
             alias         = dto.payment?.alias ?: "zup.cacupe",
             cedula        = dto.payment?.cedula ?: "6208713",
-            phase         = phase
+            phase         = phase,
+            cashOnDelivery = dto.payment_status == "CASH_ON_DELIVERY"
         )).copy(
             items         = dto.items.ifBlank { dto.client_name },
             destination   = dto.destination,
@@ -451,7 +473,9 @@ object TripRepository {
             amountGs      = dto.amount_gs.takeIf { it > 0 } ?: dto.fare_gs,
             phase         = phase,
             driverName    = dto.driver_name,
-            driverVehicle = dto.driver_vehicle
+            driverVehicle = dto.driver_vehicle,
+            cashOnDelivery = dto.payment_status == "CASH_ON_DELIVERY" ||
+                (current?.cashOnDelivery == true)
         )
 
         com.example.zuppon.network.NetworkRepository.serverOrderId = dto.id
@@ -479,7 +503,8 @@ object TripRepository {
         dto.status == "DELIVERING" -> ActiveOrderPhase.DELIVERING
         dto.status == "PICKED_UP"  -> ActiveOrderPhase.PICKED_UP
         dto.status == "ACCEPTED"   -> ActiveOrderPhase.DRIVER_ASSIGNED
-        dto.payment_status == "PAID" -> ActiveOrderPhase.SEARCHING_DRIVER
+        dto.payment_status == "PAID" ||
+            dto.payment_status == "CASH_ON_DELIVERY" -> ActiveOrderPhase.SEARCHING_DRIVER
         else -> ActiveOrderPhase.AWAITING_PAYMENT
     }
 
@@ -498,7 +523,7 @@ object TripRepository {
             )
         } else null
 
-        _tripState.value = when (phase) {
+        setTripState(when (phase) {
             ActiveOrderPhase.AWAITING_PAYMENT,
             ActiveOrderPhase.PENDING_REVIEW   -> TripState.AwaitingPayment
             ActiveOrderPhase.SEARCHING_DRIVER -> TripState.SearchingDriver
@@ -514,7 +539,7 @@ object TripRepository {
             ActiveOrderPhase.COMPLETED        -> TripState.Completed(
                 _activeOrder.value?.fare ?: 0.0
             )
-        }
+        })
     }
 
     private fun syncHistoryFromDto(dto: OrderDto, phase: ActiveOrderPhase) {
@@ -647,7 +672,8 @@ object TripRepository {
                 }
 
                 val pendingDtos = orders.filter {
-                    it.status == "PENDING" && it.payment_status == "PAID"
+                    it.status == "PENDING" &&
+                        (it.payment_status == "PAID" || it.payment_status == "CASH_ON_DELIVERY")
                 }
                 android.util.Log.d("ZUPPON_REPO", "📋 Pedidos PENDING filtrados: ${pendingDtos.size}")
 

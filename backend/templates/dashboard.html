@@ -188,6 +188,7 @@
     .pay-AWAITING_PAYMENT { background: #2a2200; color: #FFD54F; }
     .pay-PENDING_REVIEW   { background: #1a2a3a; color: #29B6F6; }
     .pay-PAID             { background: #0a2a1a; color: #66BB6A; }
+    .pay-CASH_ON_DELIVERY { background: #1a3a1a; color: #81C784; }
 
     /* ── Filter tabs ── */
     .filters {
@@ -446,6 +447,7 @@
     AWAITING_PAYMENT: '💸 Esperando transferencia',
     PENDING_REVIEW:   '📸 Comprobante enviado',
     PAID:             '✅ Pagado',
+    CASH_ON_DELIVERY: '💵 Efectivo al entregar',
     CANCELLED:        '❌ Cancelado',
   };
 
@@ -476,30 +478,27 @@
     return o.client_name || 'Cliente';
   }
 
-  function renderOrders(orders) {
-    const container = document.getElementById('orders-container');
-    const count = document.getElementById('orders-count');
+  function orderSig(o) {
+    const b = o.buyer || {};
+    return [
+      o.status, o.payment_status, o.driver_name, o.driver_vehicle,
+      o.items, o.destination, o.fare, o.client_name,
+      b.username, b.email, b.user_id, o.client_phone
+    ].join('|');
+  }
 
-    if (!orders.length) {
-      container.innerHTML = '<div class="empty"><div class="emoji">📭</div>Sin pedidos con este filtro</div>';
-      count.textContent = '0 pedidos';
-      return;
-    }
-
-    count.textContent = `${orders.length} pedido${orders.length !== 1 ? 's' : ''}`;
-
-    container.innerHTML = orders.map(o => {
-      const b = o.buyer || {};
-      const phone = (o.client_phone || b.phone || '').trim();
-      const phoneHtml = phone
-        ? `<div>📞 <a href="tel:${phone.replace(/\s/g,'')}" style="color:#66BB6A;text-decoration:none">${esc(phone)}</a></div>`
-        : '<div>📞 <span style="color:#666">Sin teléfono</span></div>';
-      return `
-      <div class="order-card">
+  function buildOrderCardHtml(o) {
+    const b = o.buyer || {};
+    const phone = (o.client_phone || b.phone || '').trim();
+    const phoneHtml = phone
+      ? `<div>📞 <a href="tel:${phone.replace(/\s/g,'')}" style="color:#66BB6A;text-decoration:none">${esc(phone)}</a></div>`
+      : '<div>📞 <span style="color:#666">Sin teléfono</span></div>';
+    return `
+      <div class="order-card" data-id="${o.id}" data-sig="${esc(orderSig(o))}">
         <div class="order-header">
           <div>
             <div style="font-size:11px;color:#555">Pedido #${o.id}</div>
-            <div style="font-size:13px;color:#fff;margin-top:4px;font-weight:700">${esc(buyerLabel(o))}</div>
+            <div class="order-buyer-name" style="font-size:13px;color:#fff;margin-top:4px;font-weight:700">${esc(buyerLabel(o))}</div>
           </div>
           <span class="status-pill status-${o.status}">${STATUS_LABELS[o.status] || o.status}</span>
         </div>
@@ -533,7 +532,60 @@
           </div>
         </div>
       </div>`;
-    }).join('');
+  }
+
+  function renderOrders(orders) {
+    const container = document.getElementById('orders-container');
+    const count = document.getElementById('orders-count');
+
+    if (!orders.length) {
+      if (!container.querySelector('.empty-state')) {
+        container.innerHTML = '<div class="empty empty-state"><div class="emoji">📭</div>Sin pedidos con este filtro</div>';
+      }
+      count.textContent = '0 pedidos';
+      return;
+    }
+
+    container.querySelector('.empty-state')?.remove();
+    count.textContent = `${orders.length} pedido${orders.length !== 1 ? 's' : ''}`;
+
+    const wanted = new Set(orders.map(o => String(o.id)));
+    container.querySelectorAll('.order-card[data-id]').forEach(el => {
+      if (!wanted.has(el.dataset.id)) el.remove();
+    });
+
+    orders.forEach((o, idx) => {
+      const id = String(o.id);
+      const sig = orderSig(o);
+      let card = container.querySelector(`.order-card[data-id="${id}"]`);
+
+      if (card && card.dataset.sig === sig) return;
+
+      const chatEl = document.getElementById('chat-' + o.id);
+      const chatWasOpen = chatEl && !chatEl.classList.contains('hidden');
+      const chatHtml = chatWasOpen ? chatEl.innerHTML : null;
+
+      const wrap = document.createElement('div');
+      wrap.innerHTML = buildOrderCardHtml(o);
+      const fresh = wrap.firstElementChild;
+      fresh.dataset.sig = sig;
+
+      if (chatWasOpen && chatHtml) {
+        const box = fresh.querySelector('#chat-' + o.id);
+        if (box) {
+          box.classList.remove('hidden');
+          box.innerHTML = chatHtml;
+        }
+      }
+
+      if (card) {
+        card.replaceWith(fresh);
+      } else {
+        const ref = container.children[idx] || null;
+        if (ref) container.insertBefore(fresh, ref);
+        else container.appendChild(fresh);
+      }
+    });
   }
 
   async function toggleChat(orderId, event) {
@@ -587,29 +639,19 @@
   }
 
   function refreshCurrentPanel() {
-    loadOrders();
-    loadUsers();
+    if (currentPanel === 'orders') loadOrders(true);
+    else loadUsers(true);
     document.getElementById('last-update').textContent =
       'actualizado ' + new Date().toLocaleTimeString('es-PY');
   }
 
-  function renderUsers() {
-    const tbody = document.getElementById('users-tbody');
-    const summary = document.getElementById('users-summary');
-    document.getElementById('stat-users').textContent = usersTotal;
+  function userSig(u) {
+    return [u.username, u.display_name, u.email, u.orders_count, u.is_driver, u.created_at].join('|');
+  }
 
-    summary.textContent = `${usersTotal} usuario${usersTotal !== 1 ? 's' : ''} registrado${usersTotal !== 1 ? 's' : ''}`;
-
-    if (!allUsers.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#555;padding:32px">Sin usuarios todavía</td></tr>';
-      return;
-    }
-
-    const driversCount = allUsers.filter(u => u.is_driver).length;
-    summary.textContent = `${usersTotal} usuario${usersTotal !== 1 ? 's' : ''} registrado${usersTotal !== 1 ? 's' : ''} · ${driversCount} repartidor${driversCount !== 1 ? 'es' : ''}`;
-
-    tbody.innerHTML = allUsers.map(u => `
-      <tr>
+  function buildUserRowHtml(u) {
+    return `
+      <tr data-user-id="${u.id}" data-sig="${esc(userSig(u))}">
         <td>#${u.id}</td>
         <td>${u.username
           ? `<span class="user-username">@${esc(u.username)}</span>`
@@ -629,8 +671,50 @@
           </button>
         </td>
         <td>${formatTime(u.created_at)}</td>
-      </tr>
-    `).join('');
+      </tr>`;
+  }
+
+  function renderUsers() {
+    const tbody = document.getElementById('users-tbody');
+    const summary = document.getElementById('users-summary');
+    document.getElementById('stat-users').textContent = usersTotal;
+
+    if (!allUsers.length) {
+      if (!tbody.querySelector('.empty-users')) {
+        tbody.innerHTML = '<tr class="empty-users"><td colspan="7" style="text-align:center;color:#555;padding:32px">Sin usuarios todavía</td></tr>';
+      }
+      summary.textContent = '0 usuarios registrados';
+      return;
+    }
+
+    tbody.querySelector('.empty-users')?.remove();
+
+    const driversCount = allUsers.filter(u => u.is_driver).length;
+    summary.textContent = `${usersTotal} usuario${usersTotal !== 1 ? 's' : ''} registrado${usersTotal !== 1 ? 's' : ''} · ${driversCount} repartidor${driversCount !== 1 ? 'es' : ''}`;
+
+    const wanted = new Set(allUsers.map(u => String(u.id)));
+    tbody.querySelectorAll('tr[data-user-id]').forEach(row => {
+      if (!wanted.has(row.dataset.userId)) row.remove();
+    });
+
+    allUsers.forEach((u, idx) => {
+      const id = String(u.id);
+      const sig = userSig(u);
+      let row = tbody.querySelector(`tr[data-user-id="${id}"]`);
+      if (row && row.dataset.sig === sig) return;
+
+      const wrap = document.createElement('tbody');
+      wrap.innerHTML = buildUserRowHtml(u);
+      const fresh = wrap.firstElementChild;
+      fresh.dataset.sig = sig;
+
+      if (row) row.replaceWith(fresh);
+      else {
+        const ref = tbody.children[idx] || null;
+        if (ref) tbody.insertBefore(fresh, ref);
+        else tbody.appendChild(fresh);
+      }
+    });
   }
 
   async function toggleDriver(userId, makeDriver, btn) {
@@ -657,7 +741,7 @@
     return d.innerHTML;
   }
 
-  async function loadUsers() {
+  async function loadUsers(silent = false) {
     try {
       const res = await fetch('/api/admin/users');
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -666,9 +750,11 @@
       usersTotal = data.total || allUsers.length;
       renderUsers();
     } catch (e) {
-      document.getElementById('users-tbody').innerHTML =
-        `<tr><td colspan="7" style="text-align:center;color:#EF5350;padding:32px">Error: ${esc(e.message)}</td></tr>`;
-      document.getElementById('users-summary').textContent = 'No se pudieron cargar los usuarios';
+      if (!silent) {
+        document.getElementById('users-tbody').innerHTML =
+          `<tr><td colspan="7" style="text-align:center;color:#EF5350;padding:32px">Error: ${esc(e.message)}</td></tr>`;
+        document.getElementById('users-summary').textContent = 'No se pudieron cargar los usuarios';
+      }
     }
   }
 
@@ -685,7 +771,7 @@
       revenue > 0 ? 'Gs ' + revenue.toLocaleString('es-PY') : '0';
   }
 
-  async function loadOrders() {
+  async function loadOrders(silent = false) {
     try {
       const res = await fetch('/api/orders');
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -696,8 +782,10 @@
       document.getElementById('last-update').textContent =
         'actualizado ' + new Date().toLocaleTimeString('es-PY');
     } catch (e) {
-      document.getElementById('orders-container').innerHTML =
-        `<div class="empty"><div class="emoji">⚠️</div>Error al cargar: ${e.message}</div>`;
+      if (!silent) {
+        document.getElementById('orders-container').innerHTML =
+          `<div class="empty"><div class="emoji">⚠️</div>Error al cargar: ${e.message}</div>`;
+      }
     }
   }
 
@@ -734,9 +822,9 @@
     }
   }
 
-  // Cargar al inicio y actualizar cada 5 segundos
-  loadOrders();
-  loadUsers();
+  // Cargar al inicio y actualizar en silencio cada 5 segundos
+  loadOrders(false);
+  loadUsers(false);
   setInterval(refreshCurrentPanel, 5000);
 </script>
 </body>

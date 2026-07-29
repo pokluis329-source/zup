@@ -69,6 +69,8 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
     private var orderSheet: BottomSheetDialog? = null
     private var previousDriverStatus: DriverStatus? = null
     private lateinit var requestNotifications: () -> Unit
+    private var lastDriverPanel: String? = null
+    private val historyCards = mutableMapOf<Long, View>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -172,6 +174,7 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                 clearActiveTripFromMap()
             }
             previousDriverStatus = status
+            lastDriverPanel = null
 
             when (status) {
                 DriverStatus.OFFLINE -> {
@@ -375,14 +378,24 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
     // ── Historial ─────────────────────────────────────────────────────────────
 
     private fun renderHistory(history: List<OrderRecord>) {
-        binding.llOrderHistory.removeAllViews()
         if (history.isEmpty()) {
+            historyCards.values.forEach { it.visibility = View.GONE }
             binding.layoutEmptyHistory.visibility = View.VISIBLE
             return
         }
         binding.layoutEmptyHistory.visibility = View.GONE
+        val alive = history.map { it.id }.toSet()
+        historyCards.keys.filter { it !in alive }.forEach { id ->
+            historyCards.remove(id)?.let { binding.llOrderHistory.removeView(it) }
+        }
         history.forEach { record ->
-            val card = layoutInflater.inflate(R.layout.item_order_history, binding.llOrderHistory, false)
+            val card = historyCards[record.id] ?: run {
+                layoutInflater.inflate(R.layout.item_order_history, binding.llOrderHistory, false)
+                    .also {
+                        historyCards[record.id] = it
+                        binding.llOrderHistory.addView(it, 0)
+                    }
+            }
             card.findViewById<TextView>(R.id.tv_order_destination).text = "📍 ${record.destination}"
             card.findViewById<TextView>(R.id.tv_order_fare).text        = record.formattedFare()
             card.findViewById<TextView>(R.id.tv_order_time).text        = record.formattedTime()
@@ -395,60 +408,49 @@ class DriverActivity : AppCompatActivity(), OnMapReadyCallback {
                 OrderStatus.COMPLETED  -> { statusTv.text = "✅ Entregado";            statusTv.setTextColor(getColor(R.color.zuppon_green)) }
                 OrderStatus.CANCELLED  -> { statusTv.text = "❌ Cancelado";            statusTv.setTextColor(getColor(R.color.zuppon_accent)) }
             }
-            binding.llOrderHistory.addView(card)
         }
     }
 
-    // ── Estado del panel inferior ─────────────────────────────────────────────
-
     private fun renderTripState(state: TripState) {
+        val panel = when (state) {
+            is TripState.Idle, TripState.Cancelled, TripState.AwaitingPayment -> when (viewModel.driverStatus.value) {
+                DriverStatus.OFFLINE -> "offline"
+                DriverStatus.ONLINE -> "online"
+                else -> "offline"
+            }
+            is TripState.SearchingDriver -> if (viewModel.driverStatus.value == DriverStatus.ONLINE) "online" else "offline"
+            is TripState.DriverOnWay, is TripState.DriverArrived, is TripState.InProgress ->
+                if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP) "active" else "online"
+            is TripState.Completed -> "online"
+        }
+        if (panel == lastDriverPanel) {
+            if (panel == "active") bindActiveClientInfo(TripRepository.pendingRequest.value)
+            return
+        }
+        lastDriverPanel = panel
+
         binding.layoutOffline.visibility    = View.GONE
         binding.layoutOnline.visibility     = View.GONE
         binding.layoutRequest.visibility    = View.GONE
         binding.layoutActiveTrip.visibility = View.GONE
         binding.layoutHistory.visibility    = View.GONE
 
-        when (state) {
-            is TripState.Idle, TripState.Cancelled, TripState.AwaitingPayment -> {
-                when (viewModel.driverStatus.value) {
-                    DriverStatus.OFFLINE -> {
-                        binding.layoutOffline.visibility = View.VISIBLE
-                        binding.layoutHistory.visibility = View.VISIBLE
-                    }
-                    DriverStatus.ONLINE -> binding.layoutOnline.visibility = View.VISIBLE
-                    else -> {
-                        binding.layoutOffline.visibility = View.VISIBLE
-                        binding.layoutHistory.visibility = View.VISIBLE
-                    }
-                }
+        when (panel) {
+            "offline" -> {
+                binding.layoutOffline.visibility = View.VISIBLE
+                binding.layoutHistory.visibility = View.VISIBLE
             }
-            is TripState.SearchingDriver -> {
-                if (viewModel.driverStatus.value == DriverStatus.ONLINE)
-                    binding.layoutOnline.visibility = View.VISIBLE
-                else
-                    binding.layoutOffline.visibility = View.VISIBLE
-            }
-            is TripState.DriverOnWay -> {
-                if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP) {
-                    binding.layoutActiveTrip.visibility = View.VISIBLE
-                    bindActiveClientInfo(TripRepository.pendingRequest.value)
+            "online" -> binding.layoutOnline.visibility = View.VISIBLE
+            "active" -> {
+                binding.layoutActiveTrip.visibility = View.VISIBLE
+                bindActiveClientInfo(TripRepository.pendingRequest.value)
+                if (state is TripState.DriverOnWay) {
                     TripRepository.pendingRequest.value?.let { drawRouteToRequest(it) }
-                } else {
-                    binding.layoutOnline.visibility = View.VISIBLE
                 }
-            }
-            is TripState.DriverArrived, is TripState.InProgress -> {
-                if (viewModel.driverStatus.value == DriverStatus.ACTIVE_TRIP) {
-                    binding.layoutActiveTrip.visibility = View.VISIBLE
-                    bindActiveClientInfo(TripRepository.pendingRequest.value)
-                } else
-                    binding.layoutOnline.visibility = View.VISIBLE
-            }
-            is TripState.Completed -> {
-                binding.layoutOnline.visibility = View.VISIBLE
-                clearActiveTripFromMap()
             }
         }
+
+        if (state is TripState.Completed) clearActiveTripFromMap()
     }
 
     /** Quita ruta/destino del viaje terminado y vuelve al mapa libre del repartidor. */

@@ -25,7 +25,7 @@ import com.example.zuppon.databinding.ActivityPassengerBinding
 import com.example.zuppon.model.ActiveOrder
 import com.example.zuppon.model.ActiveOrderPhase
 import com.example.zuppon.model.FoodMenu
-import com.example.zuppon.model.TripState
+import com.example.zuppon.util.UserSession
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -88,6 +88,9 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
     private val phraseHandler = android.os.Handler(Looper.getMainLooper())
     private var showTrackingForActiveOrder = false
     private lateinit var requestNotifications: () -> Unit
+    private var lastRenderedTripState: TripState? = null
+    private var activeOrderCard: View? = null
+    private var completedBounceShown = false
     private val phraseRunnable = object : Runnable {
         override fun run() {
             if (viewModel.tripState.value == TripState.SearchingDriver) {
@@ -578,6 +581,15 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             viewModel.activeOrder.value?.let { openPaymentChatFromActive(it) }
         }
 
+        binding.togglePaymentMethod.check(R.id.btn_pay_transfer)
+        binding.togglePaymentMethod.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            binding.tvPaymentHint.text = when (checkedId) {
+                R.id.btn_pay_cash -> "pagás en efectivo cuando te llegue el pedido"
+                else -> "transferís y enviás comprobante al confirmar"
+            }
+        }
+
         binding.btnRequestRide.setOnClickListener {
             val address = binding.etDeliveryAddress.text?.toString()?.trim() ?: ""
             if (address.isBlank()) {
@@ -758,15 +770,43 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         if (order == null) {
             binding.sectionActiveOrders.visibility = View.GONE
             binding.llActiveOrders.removeAllViews()
+            activeOrderCard = null
             return
         }
 
         binding.sectionActiveOrders.visibility = View.VISIBLE
-        binding.llActiveOrders.removeAllViews()
+        val card = activeOrderCard ?: run {
+            LayoutInflater.from(this)
+                .inflate(R.layout.item_active_order, binding.llActiveOrders, false)
+                .also {
+                    binding.llActiveOrders.removeAllViews()
+                    binding.llActiveOrders.addView(it)
+                    activeOrderCard = it
+                    wireActiveOrderCard(it)
+                }
+        }
+        updateActiveOrderCard(card, order)
+    }
 
-        val card = LayoutInflater.from(this)
-            .inflate(R.layout.item_active_order, binding.llActiveOrders, false)
+    private fun wireActiveOrderCard(card: View) {
+        card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_chat)
+            .setOnClickListener {
+                viewModel.activeOrder.value?.let { openPaymentChatFromActive(it) }
+            }
+        card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_track)
+            .setOnClickListener {
+                showTrackingForActiveOrder = true
+                lastRenderedTripState = null
+                renderTripState(viewModel.tripState.value ?: TripState.Idle)
+            }
+        card.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_active_cancel)
+            .setOnClickListener {
+                viewModel.cancelOrder()
+                Toast.makeText(this, "Pedido cancelado", Toast.LENGTH_SHORT).show()
+            }
+    }
 
+    private fun updateActiveOrderCard(card: View, order: ActiveOrder) {
         card.findViewById<TextView>(R.id.tv_active_order_title).text =
             "Pedido #${order.serverOrderId}"
         card.findViewById<TextView>(R.id.tv_active_order_items).text = order.items
@@ -785,27 +825,16 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             ActiveOrderPhase.PENDING_REVIEW -> "💬 Chat pago"
             else -> "💬 Chat"
         }
-        chatBtn.setOnClickListener { openPaymentChatFromActive(order) }
 
         trackBtn.text = when (order.phase) {
             ActiveOrderPhase.COMPLETED -> "⭐ Calificar"
             else -> "📍 Seguir"
-        }
-        trackBtn.setOnClickListener {
-            showTrackingForActiveOrder = true
-            renderTripState(viewModel.tripState.value ?: TripState.Idle)
         }
 
         val canCancel = order.phase == ActiveOrderPhase.AWAITING_PAYMENT ||
             order.phase == ActiveOrderPhase.PENDING_REVIEW ||
             order.phase == ActiveOrderPhase.SEARCHING_DRIVER
         cancelBtn.visibility = if (canCancel) View.VISIBLE else View.GONE
-        cancelBtn.setOnClickListener {
-            viewModel.cancelOrder()
-            Toast.makeText(this, "Pedido cancelado", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.llActiveOrders.addView(card)
     }
 
     private fun openPaymentChatFromActive(order: ActiveOrder) {
@@ -815,6 +844,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
                 .putExtra(PaymentChatActivity.EXTRA_AMOUNT_GS, order.amountGs)
                 .putExtra(PaymentChatActivity.EXTRA_ALIAS, order.alias)
                 .putExtra(PaymentChatActivity.EXTRA_CEDULA, order.cedula)
+                .putExtra(PaymentChatActivity.EXTRA_CASH_ON_DELIVERY, order.cashOnDelivery)
         )
     }
 
@@ -831,13 +861,28 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    private fun ensureMenuScreen() {
+        if (binding.layoutMenuScreen.visibility != View.VISIBLE) showMenuScreen()
+    }
+
+    private fun ensureTrackingScreen() {
+        if (binding.layoutTrackingScreen.visibility != View.VISIBLE) showTrackingScreen()
+    }
+
     private fun renderTripState(state: TripState) {
+        if (state == lastRenderedTripState &&
+            state !is TripState.SearchingDriver
+        ) {
+            return
+        }
+        lastRenderedTripState = state
+
         val hasActive = viewModel.activeOrder.value != null
         when (state) {
             is TripState.Idle, TripState.Cancelled -> {
                 phraseHandler.removeCallbacks(phraseRunnable)
                 showTrackingForActiveOrder = false
-                showMenuScreen()
+                ensureMenuScreen()
                 binding.layoutSearching.visibility = View.GONE
                 binding.layoutCompleted.visibility = View.GONE
                 binding.cardStatusBadge.visibility = View.GONE
@@ -845,32 +890,35 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             }
             is TripState.Completed -> {
                 if (showTrackingForActiveOrder && hasActive) {
-                    showTrackingScreen()
+                    ensureTrackingScreen()
                     binding.layoutSearching.visibility = View.GONE
                     binding.layoutCompleted.visibility = View.VISIBLE
                     binding.cardStatusBadge.visibility = View.GONE
                     binding.cardDriverInfo.visibility  = View.GONE
-                    bounceIn(binding.layoutCompleted)
+                    if (!completedBounceShown) {
+                        bounceIn(binding.layoutCompleted)
+                        completedBounceShown = true
+                    }
                 } else {
                     phraseHandler.removeCallbacks(phraseRunnable)
-                    showMenuScreen()
-                    bindActiveOrders(viewModel.activeOrder.value)
+                    completedBounceShown = false
+                    ensureMenuScreen()
                 }
             }
             else -> {
+                completedBounceShown = false
                 if (showTrackingForActiveOrder && hasActive) {
                     renderTrackingState(state)
                 } else {
                     phraseHandler.removeCallbacks(phraseRunnable)
-                    showMenuScreen()
-                    bindActiveOrders(viewModel.activeOrder.value)
+                    ensureMenuScreen()
                 }
             }
         }
     }
 
     private fun renderTrackingState(state: TripState) {
-        showTrackingScreen()
+        ensureTrackingScreen()
         binding.layoutCompleted.visibility = View.GONE
         updateTrackingChatButton()
         when (state) {
@@ -930,7 +978,7 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun submitOrder(address: String, lat: Double, lng: Double) {
         val phone = binding.etBuyerPhone.text?.toString()?.trim().orEmpty()
-        val name  = binding.etBuyerName.text?.toString()?.trim().orEmpty().ifBlank { "Cliente" }
+        val payOnDelivery = binding.togglePaymentMethod.checkedButtonId == R.id.btn_pay_cash
 
         if (phone.length < 6) {
             Toast.makeText(this, "Ingresá tu teléfono para que el repartidor pueda contactarte", Toast.LENGTH_LONG).show()
@@ -946,14 +994,30 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             destLat = lat,
             destLng = lng,
             buyerPhone = phone,
-            buyerName = name,
-            onOrderCreated = { order -> openPaymentChat(order) },
+            buyerName = UserSession.displayName(),
+            payOnDelivery = payOnDelivery,
+            onOrderCreated = { order ->
+                if (order.payment_status == "CASH_ON_DELIVERY") {
+                    onCashOrderConfirmed()
+                } else {
+                    openPaymentChat(order)
+                }
+            },
             onError = { msg ->
                 binding.btnRequestRide.isEnabled = true
                 binding.btnRequestRide.text = "Confirmar pedido"
                 Toast.makeText(this, "No se pudo crear el pedido: $msg", Toast.LENGTH_LONG).show()
             }
         )
+    }
+
+    private fun onCashOrderConfirmed() {
+        binding.btnRequestRide.isEnabled = true
+        binding.btnRequestRide.text = "Confirmar pedido"
+        viewModel.clearCartAfterOrder()
+        showTrackingForActiveOrder = false
+        showMenuScreen()
+        Toast.makeText(this, "Pedido confirmado · buscando repartidor 💵", Toast.LENGTH_LONG).show()
     }
 
     private fun openPaymentChat(order: com.example.zuppon.network.OrderDto) {

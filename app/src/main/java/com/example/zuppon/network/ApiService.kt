@@ -56,7 +56,8 @@ data class CreateOrderRequest(
     val client_name: String = "Cliente",
     val client_phone: String = "",
     val dest_lat: Double = 0.0,
-    val dest_lng: Double = 0.0
+    val dest_lng: Double = 0.0,
+    val payment_method: String = "transfer"
 )
 
 data class PaymentStatusDto(

@@ -46,6 +46,7 @@ object ActiveOrderStorage {
         put("phase", o.phase.name)
         put("driverName", o.driverName)
         put("driverVehicle", o.driverVehicle)
+        put("cashOnDelivery", o.cashOnDelivery)
         put("createdAt", o.createdAt)
     }
 
@@ -62,6 +63,7 @@ object ActiveOrderStorage {
         }.getOrDefault(ActiveOrderPhase.AWAITING_PAYMENT),
         driverName = j.optString("driverName").takeIf { it.isNotBlank() },
         driverVehicle = j.optString("driverVehicle").takeIf { it.isNotBlank() },
+        cashOnDelivery = j.optBoolean("cashOnDelivery", false),
         createdAt = j.optLong("createdAt", System.currentTimeMillis())
     )
 }

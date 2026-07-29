@@ -92,7 +92,7 @@ class Order(db.Model):
     amount_gs    = db.Column(db.Integer, default=0)           # monto cobrado en Gs
 
     payment_status = db.Column(db.String(24), default="AWAITING_PAYMENT")
-    # AWAITING_PAYMENT → PENDING_REVIEW → PAID | CANCELLED
+    # AWAITING_PAYMENT → PENDING_REVIEW → PAID | CASH_ON_DELIVERY | CANCELLED
 
     status       = db.Column(db.String(20), default="PENDING")
     # PENDING → ACCEPTED → PICKED_UP → DELIVERING → COMPLETED / CANCELLED

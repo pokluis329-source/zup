@@ -177,6 +177,7 @@ class PassengerViewModel : ViewModel() {
         destLng: Double = 0.0,
         buyerPhone: String = "",
         buyerName: String = "Cliente",
+        payOnDelivery: Boolean = false,
         onOrderCreated: (OrderDto) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
@@ -194,6 +195,7 @@ class PassengerViewModel : ViewModel() {
             request = request,
             buyerPhone = buyerPhone,
             buyerName = buyerName,
+            paymentMethod = if (payOnDelivery) "cash" else "transfer",
             onOrderCreated = onOrderCreated,
             onError = onError
         )
