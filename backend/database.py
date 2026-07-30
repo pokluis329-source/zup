@@ -39,41 +39,38 @@ class MenuItem(db.Model):
 
 
 # Items del menú inicial — se usan para el seed la primera vez
+_GS = 7300.0
 MENU_SEED = [
-    # Populares
-    (1,  "Burger Clásica",        "Carne, lechuga, tomate, queso cheddar",           8.50,  "🍔", "🔥 Populares",    True,  "burger.webp"),
-    (2,  "Pizza Margarita",       "Salsa de tomate, mozzarella, albahaca",            9.00,  "🍕", "🔥 Populares",    True,  "pizza.webp"),
-    (3,  "Tacos al Pastor x3",    "Cerdo, piña, cilantro, cebolla",                  7.00,  "🌮", "🔥 Populares",    True,  "tacos.webp"),
-    (4,  "Pasta Carbonara",       "Espagueti, panceta, huevo, parmesano",             8.00,  "🍝", "🔥 Populares",    True,  "pasta.webp"),
-    # Hamburguesas
-    (5,  "Burger Clásica",        "Carne, lechuga, tomate, queso cheddar",           8.50,  "🍔", "🍔 Hamburguesas", False, "burger.webp"),
-    (6,  "Burger BBQ Doble",      "Doble carne, tocino, salsa BBQ, aros de cebolla", 10.50, "🥩", "🍔 Hamburguesas", True,  "bbqburger.webp"),
-    (7,  "Burger Vegana",         "Medallón de lentejas, aguacate, tomate",           9.00,  "🌿", "🍔 Hamburguesas", False, "burger.webp"),
-    (8,  "Burger Hawaiana",       "Carne, piña, queso suizo, teriyaki",               9.50,  "🍍", "🍔 Hamburguesas", False, "burger.webp"),
-    # Pizzas
-    (9,  "Pizza Margarita",       "Salsa de tomate, mozzarella, albahaca",            9.00,  "🍕", "🍕 Pizzas",       False, "pizza.webp"),
-    (10, "Pizza Pepperoni",       "Salsa de tomate, mozzarella, pepperoni",           10.00, "🍕", "🍕 Pizzas",       True,  "pizza.webp"),
-    (11, "Pizza 4 Quesos",        "Mozzarella, gouda, gorgonzola, parmesano",         11.00, "🧀", "🍕 Pizzas",       False, "pizza.webp"),
-    (12, "Pizza Vegetal",         "Champiñones, pimiento, cebolla, aceitunas",        9.50,  "🥦", "🍕 Pizzas",       False, "pizza.webp"),
-    # Tacos
-    (13, "Tacos al Pastor x3",    "Cerdo, piña, cilantro, cebolla",                  7.00,  "🌮", "🌮 Tacos",        False, "tacos.webp"),
-    (14, "Tacos de Res x3",       "Carne de res, guacamole, salsa roja",              7.50,  "🌮", "🌮 Tacos",        True,  "tacos.webp"),
-    (15, "Tacos de Camarón x3",   "Camarón a la plancha, col, limón",                 8.50,  "🦐", "🌮 Tacos",        False, "tacos.webp"),
-    (16, "Quesadilla de Pollo",   "Pollo, queso, crema, guacamole",                   6.50,  "🧀", "🌮 Tacos",        False, "tacos.webp"),
-    # Pastas
-    (17, "Pasta Carbonara",       "Espagueti, panceta, huevo, parmesano",             8.00,  "🍝", "🍜 Pastas",       True,  "pasta.webp"),
-    (18, "Pasta Bolognesa",       "Espagueti, carne molida, salsa de tomate",         8.50,  "🍝", "🍜 Pastas",       False, "pasta.webp"),
-    (19, "Pasta Alfredo",         "Fettuccine, crema, mantequilla, parmesano",        8.00,  "🍝", "🍜 Pastas",       False, "pasta.webp"),
-    (20, "Lasaña de Carne",       "Capas de pasta, carne, béchamel, queso",           9.50,  "🫕", "🍜 Pastas",       False, "lasagna.webp"),
-    # Ensaladas
-    (21, "Ensalada César",        "Pollo, lechuga romana, crutones, aderezo",         7.00,  "🥗", "🥗 Ensaladas",    True,  "salad.webp"),
-    (22, "Ensalada Caprese",      "Tomate, mozzarella, albahaca, aceite de oliva",    6.50,  "🍅", "🥗 Ensaladas",    False, "salad.webp"),
-    (23, "Bowl de Quinoa",        "Quinoa, aguacate, pepino, aderezo de limón",       8.00,  "🥑", "🥗 Ensaladas",    False, "salad.webp"),
-    # Bebidas
-    (24, "Refresco",              "Coca-Cola, Sprite o Fanta · 500 ml",               2.00,  "🥤", "🥤 Bebidas",      False, "drink.webp"),
-    (25, "Agua Natural",          "Botella 600 ml",                                   1.50,  "💧", "🥤 Bebidas",      False, "drink.webp"),
-    (26, "Jugo de Naranja",       "Natural, recién exprimido · 350 ml",               3.00,  "🍊", "🥤 Bebidas",      False, "drink.webp"),
-    (27, "Malteada de Chocolate", "Helado, leche, chocolate · 400 ml",                4.50,  "🍫", "🥤 Bebidas",      True,  "drink.webp"),
+    (
+        1,
+        "Hamburguesa Clásica",
+        "Carne, lechuga, tomate, queso cheddar",
+        35_000 / _GS,
+        "🍔",
+        "🍔 Hamburguesas",
+        True,
+        "burger.webp",
+    ),
+    (
+        2,
+        "Hamburguesa Especial",
+        "Doble carne, queso, salsa de la casa",
+        35_000 / _GS,
+        "🍔",
+        "🍔 Hamburguesas",
+        False,
+        "bbqburger.webp",
+    ),
+    (
+        3,
+        "Sandwich de pollo Navsville",
+        "Pollo crujiente, pickles, salsa especial",
+        25_000 / _GS,
+        "🥪",
+        "🥪 Sandwiches",
+        True,
+        "burger.webp",
+    ),
 ]
 
 

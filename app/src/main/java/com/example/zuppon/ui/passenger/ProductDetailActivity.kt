@@ -43,7 +43,7 @@ class ProductDetailActivity : AppCompatActivity() {
         binding.tvDetailCategory.text      = item.category
         binding.tvDetailDescription.text   = item.description
         binding.tvDetailPriceOverlay.text  =
-            "Gs %,d".format((item.price * 7300).toLong()).replace(',', '.')
+            "Gs %,d".format(Math.round(item.price * 7300)).replace(',', '.')
         binding.tvDetailBadge.visibility   = if (item.isPopular) View.VISIBLE else View.GONE
 
         // Calorías aproximadas según precio (demo)

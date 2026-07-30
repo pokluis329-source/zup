@@ -78,7 +78,7 @@ class FoodMenuAdapter(
         holder.popularBadge.visibility = if (item.isPopular) View.VISIBLE else View.GONE
         holder.name.text        = item.name
         holder.description.text = item.description
-        holder.price.text = "Gs %,d".format((item.price * 7300).toLong()).replace(',', '.')
+        holder.price.text = "Gs %,d".format(Math.round(item.price * 7300)).replace(',', '.')
 
         bindQty(holder, item, qty)
 

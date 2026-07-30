@@ -162,17 +162,39 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+def _insert_menu_seed():
+    for row in MENU_SEED:
+        db.session.add(MenuItem(
+            id=row[0], name=row[1], description=row[2], price=row[3],
+            emoji=row[4], category=row[5], is_popular=row[6], asset_image=row[7],
+        ))
+    db.session.commit()
+
+
+def _replace_menu_with_seed():
+    MenuItem.query.delete()
+    db.session.commit()
+    _insert_menu_seed()
+
+
+def _upgrade_legacy_menu_catalog():
+    """Reemplaza el menú demo antiguo (pizzas, tacos, etc.) por el catálogo actual."""
+    if MenuItem.query.filter(MenuItem.name.ilike("%Pizza%")).first():
+        _replace_menu_with_seed()
+        return
+    if MenuItem.query.count() > len(MENU_SEED):
+        _replace_menu_with_seed()
+
+
 with app.app_context():
     db.create_all()
     _ensure_order_columns()
     _ensure_user_columns()
     if MenuItem.query.count() == 0:
-        for row in MENU_SEED:
-            db.session.add(MenuItem(
-                id=row[0], name=row[1], description=row[2], price=row[3],
-                emoji=row[4], category=row[5], is_popular=row[6], asset_image=row[7]
-            ))
-        db.session.commit()
+        _insert_menu_seed()
+    else:
+        _upgrade_legacy_menu_catalog()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
