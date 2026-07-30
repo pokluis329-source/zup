@@ -175,13 +175,29 @@
       padding: 9px 22px; border-radius: 20px; font-size: 14px; cursor: pointer;
     }
 
-    .btn-upload {
-      background: #1f3a5f; border: 1px solid #2196F3; color: #fff;
-      padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: opacity .15s;
+    .photo-drop {
+      margin-top: 6px; padding: 20px; border: 2px dashed #333; border-radius: 14px;
+      background: #0d0d0d; text-align: center; position: relative; cursor: pointer;
+      transition: border-color .15s, background .15s;
     }
-    .btn-upload:hover { opacity: .88; }
-    .btn-upload:disabled { opacity: .45; cursor: wait; }
+    .photo-drop:hover, .photo-drop.dragover {
+      border-color: #2196F3; background: #101820;
+    }
+    .photo-drop input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .photo-drop-icon { font-size: 36px; margin-bottom: 8px; }
+    .photo-drop-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .btn-upload-secondary {
+      margin-top: 10px; background: #2196F3; border: none; color: #fff;
+      padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 700;
+      cursor: pointer; pointer-events: none;
+    }
+    .photo-actions { margin-top: 10px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .btn-clear-photo {
+      background: #2a2a2a; border: 1px solid #444; color: #ccc;
+      padding: 8px 16px; border-radius: 20px; font-size: 12px; cursor: pointer;
+    }
     .upload-hint { font-size: 12px; color: #666; margin-top: 8px; }
     .image-preview {
       margin-top: 12px; max-width: 100%; max-height: 160px;
@@ -261,27 +277,19 @@
 
     <div class="form-row">
       <label>Foto del producto</label>
-      <input type="file" id="field-image-file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" hidden>
-      <button type="button" class="btn-upload" id="btn-pick-image" onclick="pickImageFile()">
-        📁 Elegir desde mi computadora
-      </button>
+      <div class="photo-drop" id="photo-drop">
+        <input type="file" id="field-image-file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" title="Subir imagen">
+        <div class="photo-drop-icon">📷</div>
+        <div class="photo-drop-title">Subir imagen desde tu computadora</div>
+        <div class="upload-hint">Hacé clic en esta zona o arrastrá un archivo acá</div>
+        <button type="button" class="btn-upload-secondary">Elegir archivo…</button>
+      </div>
+      <div class="photo-actions" id="photo-actions" style="display:none">
+        <button type="button" class="btn-clear-photo" onclick="clearSelectedPhoto(event)">Quitar foto</button>
+      </div>
       <div class="upload-hint" id="image-upload-status">JPG, PNG, WebP o GIF · máx. 8 MB</div>
-      <img id="image-preview" class="image-preview" alt="" style="display:none">
+      <img id="image-preview" class="image-preview" alt="Vista previa" style="display:none">
       <input type="hidden" id="field-image">
-      <details class="image-builtin">
-        <summary style="color:#888;font-size:12px;cursor:pointer;margin-top:8px">Usar imagen incluida en la app (opcional)</summary>
-        <select id="field-image-builtin" style="margin-top:8px;width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:10px">
-          <option value="">— ninguna —</option>
-          <option value="burger.webp">burger.webp</option>
-          <option value="bbqburger.webp">bbqburger.webp</option>
-          <option value="pizza.webp">pizza.webp</option>
-          <option value="tacos.webp">tacos.webp</option>
-          <option value="pasta.webp">pasta.webp</option>
-          <option value="lasagna.webp">lasagna.webp</option>
-          <option value="salad.webp">salad.webp</option>
-          <option value="drink.webp">drink.webp</option>
-        </select>
-      </details>
     </div>
 
     <div class="form-row">
@@ -331,6 +339,8 @@
   let allItems = [];
   let activeCategory = 'Todos';
   const GS_RATE = 7300;
+  let pendingImageFile = null;
+  let pendingPreviewObjectUrl = null;
 
   function previewUrlForItem(item) {
     if (item.image_url) return item.image_url;
@@ -340,68 +350,101 @@
     return '';
   }
 
+  function revokePendingPreview() {
+    if (pendingPreviewObjectUrl) {
+      URL.revokeObjectURL(pendingPreviewObjectUrl);
+      pendingPreviewObjectUrl = null;
+    }
+  }
+
   function setImagePreview(assetImage, imageUrl) {
     const preview = document.getElementById('image-preview');
     const url = imageUrl || (assetImage && assetImage.startsWith('menu/') ? '/uploads/' + assetImage : '');
     if (url) {
       preview.src = url;
       preview.style.display = 'block';
+      document.getElementById('photo-actions').style.display = 'flex';
     } else {
       preview.removeAttribute('src');
       preview.style.display = 'none';
+      document.getElementById('photo-actions').style.display = pendingImageFile ? 'flex' : 'none';
     }
     document.getElementById('field-image').value = assetImage || '';
-    document.getElementById('field-image-builtin').value =
-      assetImage && !assetImage.startsWith('menu/') ? assetImage : '';
   }
 
-  function pickImageFile() {
-    document.getElementById('field-image-file').click();
+  function showLocalFilePreview(file) {
+    revokePendingPreview();
+    pendingImageFile = file;
+    pendingPreviewObjectUrl = URL.createObjectURL(file);
+    const preview = document.getElementById('image-preview');
+    preview.src = pendingPreviewObjectUrl;
+    preview.style.display = 'block';
+    document.getElementById('photo-actions').style.display = 'flex';
+    document.getElementById('field-image').value = '';
+    document.getElementById('image-upload-status').textContent =
+      '✅ ' + file.name + ' — se guardará al pulsar Guardar';
   }
 
-  document.getElementById('field-image-file').addEventListener('change', async (e) => {
-    const file = e.target.files && e.target.files[0];
+  function clearSelectedPhoto(ev) {
+    if (ev) ev.stopPropagation();
+    pendingImageFile = null;
+    revokePendingPreview();
+    document.getElementById('field-image-file').value = '';
+    setImagePreview('', '');
+    document.getElementById('image-upload-status').textContent = 'JPG, PNG, WebP o GIF · máx. 8 MB';
+    document.getElementById('photo-actions').style.display = 'none';
+  }
+
+  function handleImageFile(file) {
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      showToast('⚠️ La imagen es muy grande (máx. 8 MB)');
-      e.target.value = '';
+    if (!file.type.startsWith('image/')) {
+      showToast('⚠️ Elegí un archivo de imagen');
       return;
     }
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('⚠️ La imagen es muy grande (máx. 8 MB)');
+      return;
+    }
+    showLocalFilePreview(file);
+  }
 
-    const btn = document.getElementById('btn-pick-image');
-    const status = document.getElementById('image-upload-status');
-    btn.disabled = true;
-    status.textContent = 'Subiendo…';
+  const photoDrop = document.getElementById('photo-drop');
+  const fileInput = document.getElementById('field-image-file');
 
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    handleImageFile(file);
+  });
+
+  photoDrop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    photoDrop.classList.add('dragover');
+  });
+  photoDrop.addEventListener('dragleave', () => photoDrop.classList.remove('dragover'));
+  photoDrop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    photoDrop.classList.remove('dragover');
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleImageFile(file);
+  });
+
+  function buildMenuFormData() {
     const form = new FormData();
-    form.append('image', file);
-
-    try {
-      const res = await fetch('/api/menu/upload-image', { method: 'POST', body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showToast('❌ ' + (data.error || 'No se pudo subir la foto'));
-        return;
-      }
-      setImagePreview(data.asset_image, data.image_url || '/uploads/' + data.asset_image);
-      status.textContent = '✅ Foto lista · ' + file.name;
-      showToast('✅ Foto subida');
-    } catch (err) {
-      showToast('❌ Error de red al subir');
-    } finally {
-      btn.disabled = false;
-      e.target.value = '';
+    form.append('name', document.getElementById('field-name').value.trim());
+    form.append('description', document.getElementById('field-desc').value.trim());
+    form.append('price', document.getElementById('field-price').value);
+    form.append('emoji', document.getElementById('field-emoji').value.trim() || '🍔');
+    form.append('category', document.getElementById('field-category').value);
+    form.append('is_popular', document.getElementById('field-popular').checked ? 'true' : 'false');
+    form.append('is_active', document.getElementById('field-active').checked ? 'true' : 'false');
+    const existing = document.getElementById('field-image').value;
+    if (pendingImageFile) {
+      form.append('image', pendingImageFile);
+    } else if (existing) {
+      form.append('asset_image', existing);
     }
-  });
-
-  document.getElementById('field-image-builtin').addEventListener('change', (e) => {
-    const val = e.target.value;
-    if (val) {
-      document.getElementById('field-image').value = val;
-      document.getElementById('image-preview').style.display = 'none';
-      document.getElementById('image-upload-status').textContent = 'Imagen de la app: ' + val;
-    }
-  });
+    return form;
+  }
 
   document.getElementById('field-price').addEventListener('input', updatePriceHint);
   function updatePriceHint() {
@@ -496,10 +539,7 @@
     document.getElementById('field-name').value     = '';
     document.getElementById('field-desc').value     = '';
     document.getElementById('field-price').value    = '';
-    document.getElementById('field-image-file').value = '';
-    document.getElementById('field-image-builtin').value = '';
-    setImagePreview('', '');
-    document.getElementById('image-upload-status').textContent = 'JPG, PNG, WebP o GIF · máx. 8 MB';
+    clearSelectedPhoto();
     document.getElementById('field-category').value = '🍔 Hamburguesas';
     document.getElementById('price-gs-hint').textContent = '';
     document.getElementById('field-popular').checked = false;
@@ -517,11 +557,13 @@
     document.getElementById('field-name').value     = item.name;
     document.getElementById('field-desc').value     = item.description;
     document.getElementById('field-price').value    = item.price;
+    pendingImageFile = null;
+    revokePendingPreview();
     document.getElementById('field-image-file').value = '';
     setImagePreview(item.asset_image || '', previewUrlForItem(item));
     document.getElementById('image-upload-status').textContent = item.asset_image
-      ? (item.asset_image.startsWith('menu/') ? 'Foto subida al servidor' : 'Imagen de la app: ' + item.asset_image)
-      : 'JPG, PNG, WebP o GIF · máx. 8 MB';
+      ? (item.asset_image.startsWith('menu/') ? 'Foto guardada en el servidor' : 'Sin foto en servidor')
+      : 'Sin foto — podés subir una abajo';
     document.getElementById('field-category').value = item.category;
     updatePriceHint();
     document.getElementById('field-popular').checked = item.is_popular;
@@ -545,39 +587,57 @@
     if (!name)       { showToast('⚠️ El nombre es obligatorio'); return; }
     if (isNaN(price) || price < 0) { showToast('⚠️ Precio inválido'); return; }
 
-    const body = {
-      emoji:       document.getElementById('field-emoji').value.trim() || '🍔',
-      name,
-      description: document.getElementById('field-desc').value.trim(),
-      price,
-      asset_image: document.getElementById('field-image').value,
-      category:    document.getElementById('field-category').value,
-      is_popular:  document.getElementById('field-popular').checked,
-      is_active:   document.getElementById('field-active').checked,
-    };
-
     const url    = id ? `/api/menu/${id}` : '/api/menu';
     const method = id ? 'PUT' : 'POST';
-    const res    = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    const saveBtn = document.querySelector('.btn-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = pendingImageFile ? 'Guardando y subiendo foto…' : 'Guardando…';
 
-    if (res.ok) {
-      const saved = await res.json();
-      if (id) {
-        const idx = allItems.findIndex(i => i.id === saved.id);
-        if (idx >= 0) allItems[idx] = saved;
+    let res;
+    try {
+      if (pendingImageFile) {
+        res = await fetch(url, { method, body: buildMenuFormData() });
       } else {
-        allItems.unshift(saved);
+        const body = {
+          emoji:       document.getElementById('field-emoji').value.trim() || '🍔',
+          name,
+          description: document.getElementById('field-desc').value.trim(),
+          price,
+          asset_image: document.getElementById('field-image').value,
+          category:    document.getElementById('field-category').value,
+          is_popular:  document.getElementById('field-popular').checked,
+          is_active:   document.getElementById('field-active').checked,
+        };
+        res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
       }
-      closeModal();
-      buildCategoryFilters();
-      renderTable();
-      showToast(id ? '✅ Item actualizado' : '✅ Item creado');
-    } else {
-      showToast('❌ Error al guardar');
+
+      if (res.ok) {
+        const saved = await res.json();
+        if (id) {
+          const idx = allItems.findIndex(i => i.id === saved.id);
+          if (idx >= 0) allItems[idx] = saved;
+        } else {
+          allItems.unshift(saved);
+        }
+        pendingImageFile = null;
+        revokePendingPreview();
+        closeModal();
+        buildCategoryFilters();
+        renderTable();
+        showToast(id ? '✅ Item actualizado' : '✅ Item creado');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast('❌ ' + (err.error || 'Error al guardar'));
+      }
+    } catch (e) {
+      showToast('❌ Error de red');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Guardar';
     }
   }
 

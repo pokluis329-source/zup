@@ -11,7 +11,7 @@ import os
 import uuid
 from datetime import datetime
 
-from flask import Flask, jsonify, request, render_template, send_from_directory
+from flask import Flask, jsonify, request, render_template, send_from_directory, make_response
 from flask_socketio import SocketIO, emit, join_room
 from sqlalchemy import inspect, text, func
 
@@ -730,27 +730,67 @@ def get_menu():
     return jsonify([_menu_item_dict(i) for i in items])
 
 
-@app.route("/api/menu/upload-image", methods=["POST"])
-def upload_menu_image():
-    """Sube una foto del producto desde el editor web."""
-    file = request.files.get("image") or request.files.get("file")
+def _store_menu_upload(file) -> tuple[str | None, str | None]:
+    """Guarda imagen de producto. Devuelve (asset_image, error)."""
     if not file or not file.filename:
-        return jsonify({"error": "Falta el archivo de imagen"}), 400
+        return None, "Falta el archivo de imagen"
 
     header = file.stream.read(12)
     file.stream.seek(0)
     ext = _detect_image_ext(header, file.filename, file.content_type)
     if not ext:
-        return jsonify({"error": "Formato no permitido (jpg, png, webp, gif)"}), 400
+        return None, "Formato no permitido (jpg, png, webp, gif)"
 
     filename = f"{uuid.uuid4().hex[:16]}.{ext}"
     dest = os.path.join(MENU_UPLOAD_DIR, filename)
     try:
         file.save(dest)
     except OSError as exc:
-        return jsonify({"error": f"No se pudo guardar la imagen: {exc}"}), 500
+        return None, f"No se pudo guardar la imagen: {exc}"
 
-    asset_image = f"menu/{filename}"
+    return f"menu/{filename}", None
+
+
+def _form_bool(val) -> bool:
+    if isinstance(val, bool):
+        return val
+    if val is None:
+        return False
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _menu_payload_from_request() -> tuple[dict | None, str | None]:
+    """JSON o multipart/form-data (campo image opcional)."""
+    uploaded_file = request.files.get("image") or request.files.get("file")
+    uploaded_asset, upload_err = (None, None)
+    if uploaded_file and uploaded_file.filename:
+        uploaded_asset, upload_err = _store_menu_upload(uploaded_file)
+        if upload_err:
+            return None, upload_err
+
+    if request.form:
+        data = request.form.to_dict()
+        if "price" in data and data["price"] != "":
+            data["price"] = float(data["price"])
+        if "is_popular" in data:
+            data["is_popular"] = _form_bool(data["is_popular"])
+        if "is_active" in data:
+            data["is_active"] = _form_bool(data["is_active"])
+    else:
+        data = request.get_json(silent=True) or {}
+
+    if uploaded_asset:
+        data["asset_image"] = uploaded_asset
+    return data, None
+
+
+@app.route("/api/menu/upload-image", methods=["POST"])
+def upload_menu_image():
+    """Sube una foto del producto desde el editor web."""
+    file = request.files.get("image") or request.files.get("file")
+    asset_image, err = _store_menu_upload(file)
+    if err:
+        return jsonify({"error": err}), 400
     return jsonify({
         "asset_image": asset_image,
         "image_url": _menu_image_url(asset_image),
@@ -759,15 +799,17 @@ def upload_menu_image():
 
 @app.route("/api/menu", methods=["POST"])
 def create_menu_item():
-    data = request.get_json()
-    if not data.get("name") or data.get("price") is None:
+    data, err = _menu_payload_from_request()
+    if err:
+        return jsonify({"error": err}), 400
+    if not data or not data.get("name") or data.get("price") is None:
         return jsonify({"error": "name y price son obligatorios"}), 400
     item = MenuItem(
         name        = data["name"],
         description = data.get("description", ""),
         price       = float(data["price"]),
         emoji       = data.get("emoji", "🍔"),
-        category    = data.get("category", "🔥 Populares"),
+        category    = data.get("category", "🍔 Hamburguesas"),
         is_popular  = bool(data.get("is_popular", False)),
         asset_image = data.get("asset_image", ""),
         is_active   = bool(data.get("is_active", True)),
@@ -780,7 +822,11 @@ def create_menu_item():
 @app.route("/api/menu/<int:item_id>", methods=["PUT"])
 def update_menu_item(item_id):
     item = MenuItem.query.get_or_404(item_id)
-    data = request.get_json()
+    data, err = _menu_payload_from_request()
+    if err:
+        return jsonify({"error": err}), 400
+    if not data:
+        return jsonify({"error": "Sin datos"}), 400
     if "name"        in data: item.name        = data["name"]
     if "description" in data: item.description = data["description"]
     if "price"       in data: item.price       = float(data["price"])
@@ -804,7 +850,9 @@ def delete_menu_item(item_id):
 
 @app.route("/menu")
 def menu_editor():
-    return render_template("menu.html")
+    resp = make_response(render_template("menu.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
 
 
 if __name__ == "__main__":
