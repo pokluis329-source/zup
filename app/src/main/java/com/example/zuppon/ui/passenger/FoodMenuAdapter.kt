@@ -66,13 +66,20 @@ class FoodMenuAdapter(
         // Gradiente como placeholder
         holder.foodBg.setBackgroundResource(FoodMenu.backgroundFor(item.category))
 
-        // Foto real desde assets
-        if (item.assetImage.isNotEmpty()) {
+        // Foto (lista y detalle usan la misma URL / asset del ítem del servidor)
+        val hasPhoto = item.assetImage.isNotEmpty() || item.imageUrl.isNotEmpty()
+        if (hasPhoto) {
             holder.foodPhoto.visibility = View.VISIBLE
-            holder.foodPhoto.setImageBitmap(null)
-            AssetImageLoader.load(holder.foodPhoto.context, item.assetImage, holder.foodPhoto, item.imageUrl)
+            holder.foodPhoto.setImageDrawable(null)
+            AssetImageLoader.load(
+                holder.foodPhoto.context,
+                item.assetImage,
+                holder.foodPhoto,
+                item.imageUrl
+            )
         } else {
             holder.foodPhoto.visibility = View.INVISIBLE
+            holder.foodPhoto.setImageDrawable(null)
         }
 
         holder.popularBadge.visibility = if (item.isPopular) View.VISIBLE else View.GONE

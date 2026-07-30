@@ -14,18 +14,26 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- ── FOTO REAL (140dp) ── -->
-        <FrameLayout
+        <!-- ── FOTO (formato ancho 16:9, de borde a borde) ── -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="140dp">
+            android:layout_height="wrap_content">
 
-            <!-- Gradiente de color como placeholder/fallback -->
+            <FrameLayout
+                android:id="@+id/food_photo_container"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:background="#FF0D1520"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintDimensionRatio="16:9">
+
             <View
                 android:id="@+id/v_food_bg"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-            <!-- Foto real desde assets -->
             <ImageView
                 android:id="@+id/iv_food_photo"
                 android:layout_width="match_parent"
@@ -33,7 +41,6 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="Foto del plato" />
 
-            <!-- Badge popular -->
             <TextView
                 android:id="@+id/tv_popular_badge"
                 android:layout_width="wrap_content"
@@ -51,14 +58,12 @@
                 android:background="@drawable/bg_accent_pill"
                 android:visibility="gone" />
 
-            <!-- Gradiente oscuro abajo para leer el precio -->
             <View
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
+                android:layout_height="48dp"
                 android:layout_gravity="bottom"
                 android:background="@drawable/bg_gradient_bottom_dark" />
 
-            <!-- Precio flotando sobre la foto -->
             <TextView
                 android:id="@+id/tv_item_price"
                 android:layout_width="wrap_content"
@@ -73,7 +78,8 @@
                 android:shadowDy="1"
                 android:shadowRadius="4" />
 
-        </FrameLayout>
+            </FrameLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- ── INFO + CONTROLES ── -->
         <androidx.constraintlayout.widget.ConstraintLayout

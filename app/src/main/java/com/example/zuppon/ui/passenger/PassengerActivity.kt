@@ -26,6 +26,7 @@ import com.example.zuppon.model.ActiveOrder
 import com.example.zuppon.model.ActiveOrderPhase
 import com.example.zuppon.model.FoodMenu
 import com.example.zuppon.model.TripState
+import com.example.zuppon.util.MenuItemCache
 import com.example.zuppon.util.UserSession
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -130,7 +131,9 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
         if (result.resultCode == Activity.RESULT_OK) {
             val itemId = result.data?.getIntExtra(ProductDetailActivity.EXTRA_ITEM_ID, -1) ?: -1
             val qty    = result.data?.getIntExtra(ProductDetailActivity.EXTRA_QUANTITY, 1) ?: 1
-            val item   = FoodMenu.items.find { it.id == itemId } ?: return@registerForActivityResult
+            val item   = MenuItemCache.get(itemId)
+                ?: FoodMenu.items.find { it.id == itemId }
+                ?: return@registerForActivityResult
             repeat(qty) { viewModel.addToCart(item) }
             punchAnimation(binding.cardCartButton)
         }
@@ -531,7 +534,10 @@ class PassengerActivity : AppCompatActivity(), OnMapReadyCallback {
             quantities = emptyMap(),
             onAdd    = { item -> viewModel.addToCart(item); punchAnimation(binding.cardCartButton) },
             onRemove = { viewModel.removeFromCart(it) },
-            onDetail = { item -> ProductDetailActivity.startForResult(this, item.id, detailLauncher) }
+            onDetail = { item ->
+                MenuItemCache.merge(listOf(item))
+                ProductDetailActivity.startForResult(this, item.id, detailLauncher)
+            }
         )
         binding.rvFoodItems.apply {
             layoutManager = LinearLayoutManager(this@PassengerActivity)

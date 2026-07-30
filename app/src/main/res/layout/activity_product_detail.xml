@@ -11,18 +11,25 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- ── FOTO GRANDE ── -->
-        <FrameLayout
+        <!-- ── FOTO GRANDE (16:9 ancho) ── -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="300dp">
+            android:layout_height="wrap_content">
 
-            <!-- Gradiente fallback -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:background="#FF0D1520"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintDimensionRatio="16:9">
+
             <View
                 android:id="@+id/v_detail_bg"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-            <!-- Foto real -->
             <ImageView
                 android:id="@+id/iv_detail_photo"
                 android:layout_width="match_parent"
@@ -30,14 +37,12 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="Foto del plato" />
 
-            <!-- Overlay bottom -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="120dp"
                 android:layout_gravity="bottom"
                 android:background="@drawable/bg_gradient_bottom_dark" />
 
-            <!-- Botón atrás -->
             <TextView
                 android:id="@+id/btn_back"
                 android:layout_width="44dp"
@@ -51,7 +56,6 @@
                 android:textStyle="bold"
                 android:background="@drawable/bg_black_pill" />
 
-            <!-- Badge popular -->
             <TextView
                 android:id="@+id/tv_detail_badge"
                 android:layout_width="wrap_content"
@@ -69,7 +73,6 @@
                 android:background="@drawable/bg_accent_pill"
                 android:visibility="gone" />
 
-            <!-- Precio sobre la foto -->
             <TextView
                 android:id="@+id/tv_detail_price_overlay"
                 android:layout_width="wrap_content"
@@ -84,7 +87,8 @@
                 android:shadowDy="2"
                 android:shadowRadius="6" />
 
-        </FrameLayout>
+            </FrameLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- ── INFO CARD ── -->
         <LinearLayout

@@ -7,6 +7,7 @@ import android.view.View
 import android.view.animation.OvershootInterpolator
 import androidx.appcompat.app.AppCompatActivity
 import com.example.zuppon.databinding.ActivityProductDetailBinding
+import com.example.zuppon.util.MenuItemCache
 import com.example.zuppon.model.FoodMenu
 import com.example.zuppon.model.MenuItem
 import com.example.zuppon.util.AssetImageLoader
@@ -24,7 +25,8 @@ class ProductDetailActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val itemId = intent.getIntExtra(EXTRA_ITEM_ID, -1)
-        item = FoodMenu.items.find { it.id == itemId }
+        item = MenuItemCache.get(itemId)
+            ?: FoodMenu.items.find { it.id == itemId }
             ?: run { finish(); return }
 
         bindItem()
@@ -35,8 +37,16 @@ class ProductDetailActivity : AppCompatActivity() {
     private fun bindItem() {
         // Foto + gradiente fallback
         binding.vDetailBg.setBackgroundResource(FoodMenu.backgroundFor(item.category))
-        if (item.assetImage.isNotEmpty()) {
-            AssetImageLoader.load(this, item.assetImage, binding.ivDetailPhoto, item.imageUrl)
+        val hasPhoto = item.assetImage.isNotEmpty() || item.imageUrl.isNotEmpty()
+        binding.ivDetailPhoto.visibility = if (hasPhoto) View.VISIBLE else View.GONE
+        if (hasPhoto) {
+            binding.ivDetailPhoto.setImageDrawable(null)
+            AssetImageLoader.load(
+                this,
+                item.assetImage,
+                binding.ivDetailPhoto,
+                item.imageUrl
+            )
         }
 
         binding.tvDetailName.text          = item.name

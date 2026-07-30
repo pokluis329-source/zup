@@ -12,6 +12,7 @@ import com.example.zuppon.network.MenuItemDto
 import com.example.zuppon.network.NetworkRepository
 import com.example.zuppon.network.OrderDto
 import com.example.zuppon.repository.TripRepository
+import com.example.zuppon.util.MenuItemCache
 
 class PassengerViewModel : ViewModel() {
 
@@ -59,6 +60,7 @@ class PassengerViewModel : ViewModel() {
     // ── Init — cargar menú del backend ───────────────────────────────────────
 
     init {
+        MenuItemCache.replaceAll(FoodMenu.items)
         loadMenuFromServer()
     }
 
@@ -118,6 +120,7 @@ class PassengerViewModel : ViewModel() {
 
         // allItems = populares (categoría virtual) + todos los demás
         allItems = popularItems + converted
+        MenuItemCache.merge(converted)
 
         // Reconstruir categorías: "🔥 Populares" primero si hay populares,
         // luego el resto en el orden original del catálogo
