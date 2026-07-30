@@ -20,6 +20,7 @@ import payment_config
 import auth
 
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads", "receipts")
+MENU_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads", "menu")
 ALLOWED_RECEIPT_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
 
 
@@ -93,6 +94,20 @@ def _public_base_url() -> str:
     return os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 
 
+def _menu_image_url(asset_image: str) -> str | None:
+    if not asset_image or not asset_image.startswith("menu/"):
+        return None
+    path = f"/uploads/{asset_image}"
+    base = _public_base_url()
+    return f"{base}{path}" if base else path
+
+
+def _menu_item_dict(item: MenuItem) -> dict:
+    data = item.to_dict()
+    data["image_url"] = _menu_image_url(item.asset_image)
+    return data
+
+
 def _payment_welcome_message(amount_gs: int) -> str:
     info = payment_config.payment_info(amount_gs)
     gs_txt = f"{amount_gs:,}".replace(",", ".")
@@ -161,6 +176,7 @@ db.init_app(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(MENU_UPLOAD_DIR, exist_ok=True)
 
 
 def _insert_menu_seed():
@@ -479,6 +495,11 @@ def serve_receipt(filename):
     return send_from_directory(UPLOAD_DIR, filename)
 
 
+@app.route("/uploads/menu/<path:filename>")
+def serve_menu_image(filename):
+    return send_from_directory(MENU_UPLOAD_DIR, filename)
+
+
 @app.route("/api/orders/<int:order_id>/accept", methods=["POST"])
 def accept_order(order_id):
     order = Order.query.get_or_404(order_id)
@@ -706,7 +727,34 @@ def dashboard():
 @app.route("/api/menu", methods=["GET"])
 def get_menu():
     items = MenuItem.query.order_by(MenuItem.category, MenuItem.id).all()
-    return jsonify([i.to_dict() for i in items])
+    return jsonify([_menu_item_dict(i) for i in items])
+
+
+@app.route("/api/menu/upload-image", methods=["POST"])
+def upload_menu_image():
+    """Sube una foto del producto desde el editor web."""
+    file = request.files.get("image") or request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "Falta el archivo de imagen"}), 400
+
+    header = file.stream.read(12)
+    file.stream.seek(0)
+    ext = _detect_image_ext(header, file.filename, file.content_type)
+    if not ext:
+        return jsonify({"error": "Formato no permitido (jpg, png, webp, gif)"}), 400
+
+    filename = f"{uuid.uuid4().hex[:16]}.{ext}"
+    dest = os.path.join(MENU_UPLOAD_DIR, filename)
+    try:
+        file.save(dest)
+    except OSError as exc:
+        return jsonify({"error": f"No se pudo guardar la imagen: {exc}"}), 500
+
+    asset_image = f"menu/{filename}"
+    return jsonify({
+        "asset_image": asset_image,
+        "image_url": _menu_image_url(asset_image),
+    }), 201
 
 
 @app.route("/api/menu", methods=["POST"])
@@ -726,7 +774,7 @@ def create_menu_item():
     )
     db.session.add(item)
     db.session.commit()
-    return jsonify(item.to_dict()), 201
+    return jsonify(_menu_item_dict(item)), 201
 
 
 @app.route("/api/menu/<int:item_id>", methods=["PUT"])
@@ -743,7 +791,7 @@ def update_menu_item(item_id):
     if "is_active"   in data: item.is_active   = bool(data["is_active"])
     item.updated_at = datetime.utcnow()
     db.session.commit()
-    return jsonify(item.to_dict())
+    return jsonify(_menu_item_dict(item))
 
 
 @app.route("/api/menu/<int:item_id>", methods=["DELETE"])

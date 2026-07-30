@@ -11,8 +11,9 @@ data class MenuItem(
     val emoji: String,
     val category: String,
     val isPopular: Boolean = false,
-    /** Nombre del archivo en assets/food/  p.ej. "burger.webp" */
-    val assetImage: String = ""
+    /** Nombre del archivo en assets/food/ o clave menu/… en el servidor */
+    val assetImage: String = "",
+    val imageUrl: String = ""
 )
 
 object FoodMenu {

@@ -36,7 +36,7 @@ class ProductDetailActivity : AppCompatActivity() {
         // Foto + gradiente fallback
         binding.vDetailBg.setBackgroundResource(FoodMenu.backgroundFor(item.category))
         if (item.assetImage.isNotEmpty()) {
-            AssetImageLoader.load(this, item.assetImage, binding.ivDetailPhoto)
+            AssetImageLoader.load(this, item.assetImage, binding.ivDetailPhoto, item.imageUrl)
         }
 
         binding.tvDetailName.text          = item.name

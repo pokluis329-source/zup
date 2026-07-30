@@ -148,7 +148,8 @@ data class MenuItemDto(
     val category: String = "",
     val is_popular: Boolean = false,
     val asset_image: String = "",
-    val is_active: Boolean = true
+    val is_active: Boolean = true,
+    val image_url: String? = null
 )
 
 interface ApiService {

@@ -93,7 +93,8 @@ class PassengerViewModel : ViewModel() {
                 emoji       = dto.emoji,
                 category    = dto.category,
                 isPopular   = dto.is_popular,
-                assetImage  = dto.asset_image
+                assetImage  = dto.asset_image,
+                imageUrl    = dto.image_url.orEmpty()
             )
         }
 
@@ -110,7 +111,8 @@ class PassengerViewModel : ViewModel() {
                     emoji       = dto.emoji,
                     category    = "🔥 Populares",   // forzar categoría visual
                     isPopular   = true,
-                    assetImage  = dto.asset_image
+                    assetImage  = dto.asset_image,
+                imageUrl    = dto.image_url.orEmpty()
                 )
             }
 

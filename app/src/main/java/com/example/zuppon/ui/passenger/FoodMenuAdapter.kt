@@ -70,7 +70,7 @@ class FoodMenuAdapter(
         if (item.assetImage.isNotEmpty()) {
             holder.foodPhoto.visibility = View.VISIBLE
             holder.foodPhoto.setImageBitmap(null)
-            AssetImageLoader.load(holder.foodPhoto.context, item.assetImage, holder.foodPhoto)
+            AssetImageLoader.load(holder.foodPhoto.context, item.assetImage, holder.foodPhoto, item.imageUrl)
         } else {
             holder.foodPhoto.visibility = View.INVISIBLE
         }

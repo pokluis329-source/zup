@@ -174,6 +174,25 @@
       background: #2a2a2a; border: none; color: #aaa;
       padding: 9px 22px; border-radius: 20px; font-size: 14px; cursor: pointer;
     }
+
+    .btn-upload {
+      background: #1f3a5f; border: 1px solid #2196F3; color: #fff;
+      padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .btn-upload:hover { opacity: .88; }
+    .btn-upload:disabled { opacity: .45; cursor: wait; }
+    .upload-hint { font-size: 12px; color: #666; margin-top: 8px; }
+    .image-preview {
+      margin-top: 12px; max-width: 100%; max-height: 160px;
+      border-radius: 12px; border: 1px solid #333; object-fit: cover;
+    }
+    .image-builtin { margin-top: 12px; }
+    .td-thumb { width: 52px; }
+    .td-thumb img {
+      width: 44px; height: 44px; border-radius: 10px; object-fit: cover;
+      background: #111; border: 1px solid #2a2a2a;
+    }
   </style>
 </head>
 <body>
@@ -199,6 +218,7 @@
     <thead>
       <tr>
         <th></th>
+        <th>Foto</th>
         <th>Nombre</th>
         <th>Descripción</th>
         <th>Precio</th>
@@ -233,14 +253,24 @@
       <textarea id="field-desc" placeholder="Ingredientes o descripción breve…"></textarea>
     </div>
 
-    <div class="form-two">
-      <div class="form-row">
-        <label>Precio (USD) *</label>
-        <input type="number" id="field-price" step="0.50" min="0" placeholder="8.50">
-      </div>
-      <div class="form-row">
-        <label>Imagen (asset)</label>
-        <select id="field-image">
+    <div class="form-row">
+      <label>Precio (USD) *</label>
+      <input type="number" id="field-price" step="0.01" min="0" placeholder="4.79">
+      <div class="upload-hint" id="price-gs-hint"></div>
+    </div>
+
+    <div class="form-row">
+      <label>Foto del producto</label>
+      <input type="file" id="field-image-file" accept="image/jpeg,image/png,image/webp,image/gif,image/*" hidden>
+      <button type="button" class="btn-upload" id="btn-pick-image" onclick="pickImageFile()">
+        📁 Elegir desde mi computadora
+      </button>
+      <div class="upload-hint" id="image-upload-status">JPG, PNG, WebP o GIF · máx. 8 MB</div>
+      <img id="image-preview" class="image-preview" alt="" style="display:none">
+      <input type="hidden" id="field-image">
+      <details class="image-builtin">
+        <summary style="color:#888;font-size:12px;cursor:pointer;margin-top:8px">Usar imagen incluida en la app (opcional)</summary>
+        <select id="field-image-builtin" style="margin-top:8px;width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#fff;padding:10px;border-radius:10px">
           <option value="">— ninguna —</option>
           <option value="burger.webp">burger.webp</option>
           <option value="bbqburger.webp">bbqburger.webp</option>
@@ -251,19 +281,15 @@
           <option value="salad.webp">salad.webp</option>
           <option value="drink.webp">drink.webp</option>
         </select>
-      </div>
+      </details>
     </div>
 
     <div class="form-row">
       <label>Categoría</label>
       <select id="field-category">
-        <option>🔥 Populares</option>
         <option>🍔 Hamburguesas</option>
-        <option>🍕 Pizzas</option>
-        <option>🌮 Tacos</option>
-        <option>🍜 Pastas</option>
-        <option>🥗 Ensaladas</option>
-        <option>🥤 Bebidas</option>
+        <option>🥪 Sandwiches</option>
+        <option>🔥 Populares</option>
       </select>
     </div>
 
@@ -304,6 +330,86 @@
 <script>
   let allItems = [];
   let activeCategory = 'Todos';
+  const GS_RATE = 7300;
+
+  function previewUrlForItem(item) {
+    if (item.image_url) return item.image_url;
+    if (item.asset_image && item.asset_image.startsWith('menu/')) {
+      return '/uploads/' + item.asset_image;
+    }
+    return '';
+  }
+
+  function setImagePreview(assetImage, imageUrl) {
+    const preview = document.getElementById('image-preview');
+    const url = imageUrl || (assetImage && assetImage.startsWith('menu/') ? '/uploads/' + assetImage : '');
+    if (url) {
+      preview.src = url;
+      preview.style.display = 'block';
+    } else {
+      preview.removeAttribute('src');
+      preview.style.display = 'none';
+    }
+    document.getElementById('field-image').value = assetImage || '';
+    document.getElementById('field-image-builtin').value =
+      assetImage && !assetImage.startsWith('menu/') ? assetImage : '';
+  }
+
+  function pickImageFile() {
+    document.getElementById('field-image-file').click();
+  }
+
+  document.getElementById('field-image-file').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('⚠️ La imagen es muy grande (máx. 8 MB)');
+      e.target.value = '';
+      return;
+    }
+
+    const btn = document.getElementById('btn-pick-image');
+    const status = document.getElementById('image-upload-status');
+    btn.disabled = true;
+    status.textContent = 'Subiendo…';
+
+    const form = new FormData();
+    form.append('image', file);
+
+    try {
+      const res = await fetch('/api/menu/upload-image', { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast('❌ ' + (data.error || 'No se pudo subir la foto'));
+        return;
+      }
+      setImagePreview(data.asset_image, data.image_url || '/uploads/' + data.asset_image);
+      status.textContent = '✅ Foto lista · ' + file.name;
+      showToast('✅ Foto subida');
+    } catch (err) {
+      showToast('❌ Error de red al subir');
+    } finally {
+      btn.disabled = false;
+      e.target.value = '';
+    }
+  });
+
+  document.getElementById('field-image-builtin').addEventListener('change', (e) => {
+    const val = e.target.value;
+    if (val) {
+      document.getElementById('field-image').value = val;
+      document.getElementById('image-preview').style.display = 'none';
+      document.getElementById('image-upload-status').textContent = 'Imagen de la app: ' + val;
+    }
+  });
+
+  document.getElementById('field-price').addEventListener('input', updatePriceHint);
+  function updatePriceHint() {
+    const p = parseFloat(document.getElementById('field-price').value);
+    const el = document.getElementById('price-gs-hint');
+    if (isNaN(p) || p < 0) { el.textContent = ''; return; }
+    el.textContent = '≈ Gs ' + Math.round(p * GS_RATE).toLocaleString('es-PY');
+  }
 
   // ── Carga inicial ──────────────────────────────────────────────────────────
   async function loadMenu() {
@@ -343,13 +449,19 @@
 
     const tbody = document.getElementById('menu-tbody');
     if (items.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#444;padding:40px">Sin resultados</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#444;padding:40px">Sin resultados</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = items.map(item => `
+    tbody.innerHTML = items.map(item => {
+      const thumbUrl = previewUrlForItem(item);
+      const thumb = thumbUrl
+        ? `<img src="${esc(thumbUrl)}" alt="">`
+        : `<span style="font-size:22px">${item.emoji}</span>`;
+      return `
       <tr>
         <td class="td-emoji">${item.emoji}</td>
+        <td class="td-thumb">${thumb}</td>
         <td class="td-name">${esc(item.name)}</td>
         <td class="td-desc">${esc(item.description)}</td>
         <td class="td-price">
@@ -366,7 +478,8 @@
           <button class="btn-del"  onclick="confirmDelete(${item.id}, '${esc(item.name)}')">🗑 Eliminar</button>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function esc(str) {
@@ -383,8 +496,12 @@
     document.getElementById('field-name').value     = '';
     document.getElementById('field-desc').value     = '';
     document.getElementById('field-price').value    = '';
-    document.getElementById('field-image').value    = '';
-    document.getElementById('field-category').value = '🔥 Populares';
+    document.getElementById('field-image-file').value = '';
+    document.getElementById('field-image-builtin').value = '';
+    setImagePreview('', '');
+    document.getElementById('image-upload-status').textContent = 'JPG, PNG, WebP o GIF · máx. 8 MB';
+    document.getElementById('field-category').value = '🍔 Hamburguesas';
+    document.getElementById('price-gs-hint').textContent = '';
     document.getElementById('field-popular').checked = false;
     document.getElementById('field-active').checked  = true;
     document.getElementById('modal-overlay').classList.add('open');
@@ -400,8 +517,13 @@
     document.getElementById('field-name').value     = item.name;
     document.getElementById('field-desc').value     = item.description;
     document.getElementById('field-price').value    = item.price;
-    document.getElementById('field-image').value    = item.asset_image;
+    document.getElementById('field-image-file').value = '';
+    setImagePreview(item.asset_image || '', previewUrlForItem(item));
+    document.getElementById('image-upload-status').textContent = item.asset_image
+      ? (item.asset_image.startsWith('menu/') ? 'Foto subida al servidor' : 'Imagen de la app: ' + item.asset_image)
+      : 'JPG, PNG, WebP o GIF · máx. 8 MB';
     document.getElementById('field-category').value = item.category;
+    updatePriceHint();
     document.getElementById('field-popular').checked = item.is_popular;
     document.getElementById('field-active').checked  = item.is_active;
     document.getElementById('modal-overlay').classList.add('open');
